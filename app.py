@@ -58,6 +58,17 @@ WEIGHT_KEYS = [
     "entrepreneurship_program",
 ]
 
+FEATURE_LABELS = {
+    "low_cost": "Low cost",
+    "grad_rate": "Grad rate",
+    "sport_culture": "Sport culture",
+    "athlete_opportunity": "Athlete opportunity",
+    "international_community": "International community",
+    "open_admission": "Open admission",
+    "small_school": "Small school",
+    "entrepreneurship_program": "Entrepreneurship program",
+}
+
 # Default weights from notebook 04 cell 2
 DEFAULT_WEIGHTS = {
     "low_cost": 5,
@@ -77,6 +88,7 @@ with st.sidebar:
     # Budget
     st.subheader("Budget")
     max_budget = st.slider("Max budget ($/yr)", 5_000, 80_000, 25_000, step=500,
+                           format="$%d",
                            help="Max sticker cost before scholarships.")
     budget_flex = st.slider("Budget flex ×", 1.0, 2.0, 1.5, step=0.1,
                             help="Multiply budget by this to allow athletes on aid to attend.")
@@ -112,8 +124,7 @@ with st.sidebar:
     st.subheader("Score weights  (0 = ignore, 5 = critical)")
     weights = {}
     for k in WEIGHT_KEYS:
-        weights[k] = st.slider(k.replace("_", " ").capitalize(),
-                               0, 5, DEFAULT_WEIGHTS[k], key=f"w_{k}")
+        weights[k] = st.slider(FEATURE_LABELS[k], 0, 5, DEFAULT_WEIGHTS[k], key=f"w_{k}")
 
 # ── Build client dict ──────────────────────────────────────────────────────────
 client = {
@@ -138,8 +149,17 @@ results, funnel = match(df, client, top_n=25)
 
 # ── Funnel table ───────────────────────────────────────────────────────────────
 st.subheader("Filter funnel")
-funnel_df = pd.DataFrame(funnel, columns=["Step", "Schools remaining"])
-st.table(funnel_df)
+
+# Replace CIP codes in the major step label with the selected major's display name.
+major_display = major_label if major_label != "None" else ""
+pretty_funnel = []
+for step, n in funnel:
+    if step.startswith("After offers major") and major_display:
+        step = f"After offers major: {major_display.split(' (')[0]}"
+    pretty_funnel.append((step, n))
+
+funnel_df = pd.DataFrame(pretty_funnel, columns=["Step", "Schools remaining"])
+st.dataframe(funnel_df, use_container_width=False, hide_index=True)
 
 # ── Results ────────────────────────────────────────────────────────────────────
 st.subheader("Top matches")
@@ -160,6 +180,12 @@ else:
     display["athlete_share"] = display["athlete_share"].apply(
         lambda x: f"{x:.0%}" if pd.notna(x) else "—"
     )
+    # Map internal feature keys in "top_reasons" to readable labels.
+    def readable_reasons(s):
+        return ", ".join(FEATURE_LABELS.get(r.strip(), r.strip()) for r in str(s).split(","))
+
+    display["top_reasons"] = display["top_reasons"].apply(readable_reasons)
+
     display = display.rename(columns={
         "name": "School",
         "state": "ST",
@@ -173,7 +199,18 @@ else:
         "match_score": "Score",
         "top_reasons": "Top reasons",
     })
-    st.dataframe(display, use_container_width=True, hide_index=True)
+
+    col_config = {
+        "Top reasons": st.column_config.TextColumn("Top reasons", width="large"),
+    }
+    st.dataframe(display, use_container_width=True, hide_index=True, column_config=col_config)
+
+    st.caption(
+        "**How to read this:** Costs are sticker prices before scholarships — "
+        "athletes may pay significantly less. "
+        "2-year grad rates understate success because early transfers count as non-completers. "
+        "Scores are relative to this client's filtered pool (0–100), not absolute quality."
+    )
 
     csv = results[SHOW_COLS].to_csv(index=False).encode()
     st.download_button("Download results (CSV)", csv, "college_match_results.csv", "text/csv")
