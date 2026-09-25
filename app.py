@@ -3,10 +3,10 @@ College Match — Streamlit demo.
 Sidebar inputs → src/matcher.py → funnel table + ranked results.
 """
 
-import os
 import altair as alt
 import streamlit as st
 import pandas as pd
+from pathlib import Path
 
 from src.matcher import load_data, match, SHOW_COLS
 
@@ -19,7 +19,7 @@ st.caption(
 )
 
 # ── Data ───────────────────────────────────────────────────────────────────────
-DATA_PATH = os.path.join(os.path.dirname(__file__), "data/processed/schools_with_majors.csv")
+DATA_PATH = Path(__file__).parent / "data" / "processed" / "schools_with_majors.csv"
 
 
 @st.cache_data

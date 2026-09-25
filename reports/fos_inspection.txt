@@ -1,0 +1,431 @@
+Filename: Most-Recent-Cohorts-Field-of-Study.csv
+Shape: (227980, 178)
+
+--- Column names ---
+UNITID
+OPEID6
+INSTNM
+CONTROL
+MAIN
+CIPCODE
+CIPDESC
+CREDLEV
+CREDDESC
+IPEDSCOUNT1
+IPEDSCOUNT2
+DEBT_ALL_STGP_ANY_N
+DEBT_ALL_STGP_ANY_MEAN
+DEBT_ALL_STGP_ANY_MDN
+DEBT_ALL_STGP_EVAL_N
+DEBT_ALL_STGP_EVAL_MEAN
+DEBT_ALL_STGP_EVAL_MDN
+DEBT_ALL_PP_ANY_N
+DEBT_ALL_PP_ANY_MEAN
+DEBT_ALL_PP_ANY_MDN
+DEBT_ALL_PP_EVAL_N
+DEBT_ALL_PP_EVAL_MEAN
+DEBT_ALL_PP_EVAL_MDN
+DEBT_MALE_STGP_ANY_N
+DEBT_MALE_STGP_ANY_MEAN
+DEBT_MALE_STGP_ANY_MDN
+DEBT_MALE_STGP_EVAL_N
+DEBT_MALE_STGP_EVAL_MEAN
+DEBT_MALE_STGP_EVAL_MDN
+DEBT_MALE_PP_ANY_N
+DEBT_MALE_PP_ANY_MEAN
+DEBT_MALE_PP_ANY_MDN
+DEBT_MALE_PP_EVAL_N
+DEBT_MALE_PP_EVAL_MEAN
+DEBT_MALE_PP_EVAL_MDN
+DEBT_NOTMALE_STGP_ANY_N
+DEBT_NOTMALE_STGP_ANY_MEAN
+DEBT_NOTMALE_STGP_ANY_MDN
+DEBT_NOTMALE_STGP_EVAL_N
+DEBT_NOTMALE_STGP_EVAL_MEAN
+DEBT_NOTMALE_STGP_EVAL_MDN
+DEBT_NOTMALE_PP_ANY_N
+DEBT_NOTMALE_PP_ANY_MEAN
+DEBT_NOTMALE_PP_ANY_MDN
+DEBT_NOTMALE_PP_EVAL_N
+DEBT_NOTMALE_PP_EVAL_MEAN
+DEBT_NOTMALE_PP_EVAL_MDN
+DEBT_PELL_STGP_ANY_N
+DEBT_PELL_STGP_ANY_MEAN
+DEBT_PELL_STGP_ANY_MDN
+DEBT_PELL_STGP_EVAL_N
+DEBT_PELL_STGP_EVAL_MEAN
+DEBT_PELL_STGP_EVAL_MDN
+DEBT_PELL_PP_ANY_N
+DEBT_PELL_PP_ANY_MEAN
+DEBT_PELL_PP_ANY_MDN
+DEBT_PELL_PP_EVAL_N
+DEBT_PELL_PP_EVAL_MEAN
+DEBT_PELL_PP_EVAL_MDN
+DEBT_NOPELL_STGP_ANY_N
+DEBT_NOPELL_STGP_ANY_MEAN
+DEBT_NOPELL_STGP_ANY_MDN
+DEBT_NOPELL_STGP_EVAL_N
+DEBT_NOPELL_STGP_EVAL_MEAN
+DEBT_NOPELL_STGP_EVAL_MDN
+DEBT_NOPELL_PP_ANY_N
+DEBT_NOPELL_PP_ANY_MEAN
+DEBT_NOPELL_PP_ANY_MDN
+DEBT_NOPELL_PP_EVAL_N
+DEBT_NOPELL_PP_EVAL_MEAN
+DEBT_NOPELL_PP_EVAL_MDN
+DEBT_ALL_PP_ANY_MDN10YRPAY
+DEBT_ALL_PP_EVAL_MDN10YRPAY
+DEBT_ALL_STGP_ANY_MDN10YRPAY
+DEBT_ALL_STGP_EVAL_MDN10YRPAY
+EARN_COUNT_NWNE_HI_1YR
+EARN_CNTOVER150_HI_1YR
+EARN_COUNT_WNE_HI_1YR
+EARN_MDN_HI_1YR
+EARN_COUNT_NWNE_HI_2YR
+EARN_CNTOVER150_HI_2YR
+EARN_COUNT_WNE_HI_2YR
+EARN_MDN_HI_2YR
+BBRR2_FED_COMP_N
+BBRR2_FED_COMP_DFLT
+BBRR2_FED_COMP_DLNQ
+BBRR2_FED_COMP_FBR
+BBRR2_FED_COMP_DFR
+BBRR2_FED_COMP_NOPROG
+BBRR2_FED_COMP_MAKEPROG
+BBRR2_FED_COMP_PAIDINFULL
+BBRR2_FED_COMP_DISCHARGE
+BBRR3_FED_COMP_N
+BBRR3_FED_COMP_DFLT
+BBRR3_FED_COMP_DLNQ
+BBRR3_FED_COMP_FBR
+BBRR3_FED_COMP_DFR
+BBRR3_FED_COMP_NOPROG
+BBRR3_FED_COMP_MAKEPROG
+BBRR3_FED_COMP_PAIDINFULL
+BBRR3_FED_COMP_DISCHARGE
+EARN_COUNT_PELL_WNE_1YR
+EARN_PELL_WNE_MDN_1YR
+EARN_COUNT_NOPELL_WNE_1YR
+EARN_NOPELL_WNE_MDN_1YR
+EARN_COUNT_MALE_WNE_1YR
+EARN_MALE_WNE_MDN_1YR
+EARN_COUNT_NOMALE_WNE_1YR
+EARN_NOMALE_WNE_MDN_1YR
+EARN_COUNT_NE_3YR
+EARN_NE_MDN_3YR
+EARN_COUNT_WNE_3YR
+EARN_CNTOVER150_3YR
+EARN_COUNT_PELL_NE_3YR
+EARN_PELL_NE_MDN_3YR
+EARN_COUNT_NOPELL_NE_3YR
+EARN_NOPELL_NE_MDN_3YR
+EARN_COUNT_MALE_NE_3YR
+EARN_MALE_NE_MDN_3YR
+EARN_COUNT_NOMALE_NE_3YR
+EARN_NOMALE_NE_MDN_3YR
+EARN_COUNT_NWNE_1YR
+EARN_COUNT_WNE_1YR
+EARN_MDN_1YR
+EARN_GT_THRESHOLD_1YR
+EARN_COUNT_HIGH_CRED_1YR
+EARN_IN_STATE_1YR
+EARN_COUNT_NWNE_4YR
+EARN_COUNT_WNE_4YR
+EARN_MDN_4YR
+EARN_GT_THRESHOLD_4YR
+EARN_COUNT_PELL_WNE_4YR
+EARN_PELL_WNE_MDN_4YR
+EARN_COUNT_NOPELL_WNE_4YR
+EARN_NOPELL_WNE_MDN_4YR
+EARN_COUNT_MALE_WNE_4YR
+EARN_MALE_WNE_MDN_4YR
+EARN_COUNT_NOMALE_WNE_4YR
+EARN_NOMALE_WNE_MDN_4YR
+EARN_COUNT_HIGH_CRED_4YR
+EARN_IN_STATE_4YR
+BBRR1_FED_COMP_N
+BBRR1_FED_COMP_DFLT
+BBRR1_FED_COMP_DLNQ
+BBRR1_FED_COMP_FBR
+BBRR1_FED_COMP_DFR
+BBRR1_FED_COMP_NOPROG
+BBRR1_FED_COMP_MAKEPROG
+BBRR1_FED_COMP_PAIDINFULL
+BBRR1_FED_COMP_DISCHARGE
+BBRR4_FED_COMP_N
+BBRR4_FED_COMP_DFLT
+BBRR4_FED_COMP_DLNQ
+BBRR4_FED_COMP_FBR
+BBRR4_FED_COMP_DFR
+BBRR4_FED_COMP_NOPROG
+BBRR4_FED_COMP_MAKEPROG
+BBRR4_FED_COMP_PAIDINFULL
+BBRR4_FED_COMP_DISCHARGE
+DISTANCE
+EARN_COUNT_NWNE_5YR
+EARN_COUNT_WNE_5YR
+EARN_MDN_5YR
+EARN_GT_THRESHOLD_5YR
+EARN_COUNT_PELL_WNE_5YR
+EARN_PELL_WNE_MDN_5YR
+EARN_COUNT_NOPELL_WNE_5YR
+EARN_NOPELL_WNE_MDN_5YR
+EARN_COUNT_MALE_WNE_5YR
+EARN_MALE_WNE_MDN_5YR
+EARN_COUNT_NOMALE_WNE_5YR
+EARN_NOMALE_WNE_MDN_5YR
+EARN_COUNT_HIGH_CRED_5YR
+EARN_IN_STATE_5YR
+EARN_COUNT_WNE_4YR_NAT
+EARN_MDN_4YR_NAT
+EARN_P25_4YR_NAT
+EARN_P75_4YR_NAT
+
+--- Columns used ---
+UNITID:   UNITID
+CIPCODE:  CIPCODE
+CIPDESC:  CIPDESC
+CREDLEV:  CREDLEV
+CREDDESC: CREDDESC
+
+--- UNITID (UNITID) ---
+dtype: float64
+5 example values:
+0    100654.0
+1    100654.0
+2    100654.0
+3    100654.0
+4    100654.0
+
+--- CIPCODE (CIPCODE) ---
+dtype: int64
+5 example values:
+0    109
+1    110
+2    110
+3    110
+4    199
+
+--- CIPDESC (CIPDESC) ---
+dtype: object
+5 example values:
+0                                     Animal Sciences.
+1                         Food Science and Technology.
+2                         Food Science and Technology.
+3                         Food Science and Technology.
+4    Agricultural/Animal/Plant/Veterinary Science a...
+
+--- CREDLEV (CREDLEV) ---
+dtype: int64
+5 example values:
+0    3
+1    3
+2    5
+3    6
+4    3
+
+--- CREDDESC (CREDDESC) ---
+dtype: object
+5 example values:
+0    Bachelor's Degree
+1    Bachelor's Degree
+2      Master's Degree
+3      Doctoral Degree
+4    Bachelor's Degree
+
+--- CREDDESC value_counts ---
+CREDDESC
+Bachelor's Degree                                                        71664
+Undergraduate Certificate or Diploma                                     43465
+Associate's Degree                                                       42373
+Master's Degree                                                          38621
+Graduate/Professional Certificate                                        13921
+Doctoral Degree                                                          12637
+First Professional Degree                                                 2350
+Non-Credential Program (Preparatory Coursework/Teacher Certification)     1700
+Post-baccalaureate Certificate                                            1249
+
+--- Unique UNITIDs in FoS file: 6127 ---
+Rows whose UNITID is in schools_with_sevp: 202617
+Unique UNITIDs in both: 3132 of 3147 schools_with_sevp schools
+
+--- CIPDESC values containing 'Entrepreneur' or 'Small Business' ---
+ CIPCODE                                        CIPDESC
+    5207 Entrepreneurial and Small Business Operations.
+
+--- Rows with CIPCODE starting with 52 (business), by CREDDESC ---
+CREDDESC
+Bachelor's Degree                                                        8625
+Undergraduate Certificate or Diploma                                     5873
+Associate's Degree                                                       5585
+Master's Degree                                                          4479
+Graduate/Professional Certificate                                        1957
+Doctoral Degree                                                           574
+Post-baccalaureate Certificate                                            183
+Non-Credential Program (Preparatory Coursework/Teacher Certification)     181
+First Professional Degree                                                  58
+
+--- Programs for 'Washburn University' (name col: INSTNM) ---
+                                                                                                             CIPDESC                             CREDDESC
+                                                  Allied Health Diagnostic, Intervention, and Treatment Professions.                   Associate's Degree
+                                                                       Allied Health and Medical Assisting Services.                   Associate's Degree
+                                                                 Business Operations Support and Assistant Services.                   Associate's Degree
+                                                                         Computer and Information Sciences, General.                   Associate's Degree
+                                                                                   Criminal Justice and Corrections.                   Associate's Degree
+                                                                                 Culinary Arts and Related Services.                   Associate's Degree
+                                                                                            Design and Applied Arts.                   Associate's Degree
+                                                                                               Engineering, General.                   Associate's Degree
+                                                                         Health and Medical Administrative Services.                   Associate's Degree
+                                                                                             Legal Support Services.                   Associate's Degree
+                                                          Liberal Arts and Sciences, General Studies and Humanities.                   Associate's Degree
+                                                                Mechanic and Repair Technologies/Technicians, Other.                   Associate's Degree
+                                                           Mental and Social Health Services and Allied Professions.                   Associate's Degree
+                                                                                                   Natural Sciences.                   Associate's Degree
+                                                                          Science Technologies/Technicians, General.                   Associate's Degree
+                                        Teacher Education and Professional Development, Specific Levels and Methods.                   Associate's Degree
+                                                                                    Accounting and Related Services.                    Bachelor's Degree
+                                                  Allied Health Diagnostic, Intervention, and Treatment Professions.                    Bachelor's Degree
+                                                                                                       Anthropology.                    Bachelor's Degree
+                                                                     Biochemistry, Biophysics and Molecular Biology.                    Bachelor's Degree
+                                                                                                   Biology, General.                    Bachelor's Degree
+                                                                 Business Administration, Management and Operations.                    Bachelor's Degree
+                                                                                         Business/Commerce, General.                    Bachelor's Degree
+                                                                                      Business/Managerial Economics.                    Bachelor's Degree
+                                                                                                          Chemistry.                    Bachelor's Degree
+                                                Clinical/Medical Laboratory Science/Research and Allied Professions.                    Bachelor's Degree
+                                                                                    Communication and Media Studies.                    Bachelor's Degree
+                                                                                          Computer Systems Analysis.                    Bachelor's Degree
+                                                                         Computer and Information Sciences, General.                    Bachelor's Degree
+                                                                                   Criminal Justice and Corrections.                    Bachelor's Degree
+                                                                                  Drama/Theatre Arts and Stagecraft.                    Bachelor's Degree
+                                                            Ecology, Evolution, Systematics, and Population Biology.                    Bachelor's Degree
+                                                                                                          Economics.                    Bachelor's Degree
+                                                                                         Engineering-Related Fields.                    Bachelor's Degree
+                                                                           English Language and Literature, General.                    Bachelor's Degree
+                                                                      Entrepreneurial and Small Business Operations.                    Bachelor's Degree
+                                                                          Finance and Financial Management Services.                    Bachelor's Degree
+                                                                                               Fine and Studio Arts.                    Bachelor's Degree
+                                                                   Germanic Languages, Literatures, and Linguistics.                    Bachelor's Degree
+                                                                         Health and Medical Administrative Services.                    Bachelor's Degree
+                                                                                                            History.                    Bachelor's Degree
+                                                                                             International Business.                    Bachelor's Degree
+                                                                                             Legal Support Services.                    Bachelor's Degree
+                                                          Liberal Arts and Sciences, General Studies and Humanities.                    Bachelor's Degree
+                                                                       Management Sciences and Quantitative Methods.                    Bachelor's Degree
+                                                                                                          Marketing.                    Bachelor's Degree
+                                                                                                        Mathematics.                    Bachelor's Degree
+                                                           Mental and Social Health Services and Allied Professions.                    Bachelor's Degree
+                                                                          Multi-/Interdisciplinary Studies, General.                    Bachelor's Degree
+                                                                             Multi/Interdisciplinary Studies, Other.                    Bachelor's Degree
+                                                                                                              Music.                    Bachelor's Degree
+                                                                                                         Philosophy.                    Bachelor's Degree
+                                                                                                            Physics.                    Bachelor's Degree
+                                                                                   Political Science and Government.                    Bachelor's Degree
+                                                                                                Psychology, General.                    Bachelor's Degree
+                                                                                              Public Administration.                    Bachelor's Degree
+                                  Registered Nursing, Nursing Administration, Nursing Research and Clinical Nursing.                    Bachelor's Degree
+                                                                                         Religion/Religious Studies.                    Bachelor's Degree
+                                                                    Romance Languages, Literatures, and Linguistics.                    Bachelor's Degree
+                                                                                    Security Science and Technology.                    Bachelor's Degree
+                                                                                                        Social Work.                    Bachelor's Degree
+                                                                                                          Sociology.                    Bachelor's Degree
+                                                                Sports, Kinesiology, and Physical Education/Fitness.                    Bachelor's Degree
+                                        Teacher Education and Professional Development, Specific Levels and Methods.                    Bachelor's Degree
+                                             Teacher Education and Professional Development, Specific Subject Areas.                    Bachelor's Degree
+                                  Registered Nursing, Nursing Administration, Nursing Research and Clinical Nursing.                      Doctoral Degree
+                                                                                                                Law.            First Professional Degree
+                                  Registered Nursing, Nursing Administration, Nursing Research and Clinical Nursing.            First Professional Degree
+                                                                 Business Administration, Management and Operations.    Graduate/Professional Certificate
+                                                           Mental and Social Health Services and Allied Professions.    Graduate/Professional Certificate
+                                  Registered Nursing, Nursing Administration, Nursing Research and Clinical Nursing.    Graduate/Professional Certificate
+                                             Teacher Education and Professional Development, Specific Subject Areas.    Graduate/Professional Certificate
+                                                                                    Accounting and Related Services.                      Master's Degree
+                                                                 Business Administration, Management and Operations.                      Master's Degree
+                                                                                   Criminal Justice and Corrections.                      Master's Degree
+                                                                                         Curriculum and Instruction.                      Master's Degree
+                                                                         Educational Administration and Supervision.                      Master's Degree
+                                                                   Legal Research and Advanced Professional Studies.                      Master's Degree
+                                                          Liberal Arts and Sciences, General Studies and Humanities.                      Master's Degree
+                                                           Mental and Social Health Services and Allied Professions.                      Master's Degree
+                                                                                                Psychology, General.                      Master's Degree
+                                                           Public Relations, Advertising, and Applied Communication.                      Master's Degree
+                                  Registered Nursing, Nursing Administration, Nursing Research and Clinical Nursing.                      Master's Degree
+                                                                                                        Social Work.                      Master's Degree
+                                                                                     Special Education and Teaching.                      Master's Degree
+                                                                Sports, Kinesiology, and Physical Education/Fitness.                      Master's Degree
+                                             Teacher Education and Professional Development, Specific Subject Areas.                      Master's Degree
+                                                  Allied Health Diagnostic, Intervention, and Treatment Professions. Undergraduate Certificate or Diploma
+                                                        Building/Construction Finishing, Management, and Inspection. Undergraduate Certificate or Diploma
+                                                                 Business Administration, Management and Operations. Undergraduate Certificate or Diploma
+                                                                 Business Operations Support and Assistant Services. Undergraduate Certificate or Diploma
+                                                                                                         Carpenters. Undergraduate Certificate or Diploma
+                                                Clinical/Medical Laboratory Science/Research and Allied Professions. Undergraduate Certificate or Diploma
+                                                                 Computer Systems Networking and Telecommunications. Undergraduate Certificate or Diploma
+                                                                 Cosmetology and Related Personal Grooming Services. Undergraduate Certificate or Diploma
+                                                                                 Culinary Arts and Related Services. Undergraduate Certificate or Diploma
+                                                                                            Design and Applied Arts. Undergraduate Certificate or Diploma
+                                                               Drafting/Design Engineering Technologies/Technicians. Undergraduate Certificate or Diploma
+                                                                       Electrical and Power Transmission Installers. Undergraduate Certificate or Diploma
+                                                                      Entrepreneurial and Small Business Operations. Undergraduate Certificate or Diploma
+                                                                                              Ground Transportation. Undergraduate Certificate or Diploma
+                                                                                  Health Aides/Attendants/Orderlies. Undergraduate Certificate or Diploma
+                                                                         Health and Medical Administrative Services. Undergraduate Certificate or Diploma
+Heating, Air Conditioning, Ventilation and Refrigeration Maintenance Technology/Technician (HAC, HACR, HVAC, HVACR). Undergraduate Certificate or Diploma
+                                                    Heavy/Industrial Equipment Maintenance Technologies/Technicians. Undergraduate Certificate or Diploma
+                            Homeland Security, Law Enforcement, Firefighting and Related Protective Services, Other. Undergraduate Certificate or Diploma
+                                                            Human Development, Family Studies, and Related Services. Undergraduate Certificate or Diploma
+                                                                     Industrial Production Technologies/Technicians. Undergraduate Certificate or Diploma
+                                                                                                          Insurance. Undergraduate Certificate or Diploma
+                                                                                             Legal Support Services. Undergraduate Certificate or Diploma
+                                                           Mental and Social Health Services and Allied Professions. Undergraduate Certificate or Diploma
+                                                       Practical Nursing, Vocational Nursing and Nursing Assistants. Undergraduate Certificate or Diploma
+                                                                                            Precision Metal Working. Undergraduate Certificate or Diploma
+                                                            Vehicle Maintenance and Repair Technologies/Technicians. Undergraduate Certificate or Diploma
+                                                                                                        Woodworking. Undergraduate Certificate or Diploma
+
+--- Programs for 'Neosho County' ---
+                                                                                                             CIPDESC                                                              CREDDESC
+                                                                                    Accounting and Related Services.                                                    Associate's Degree
+                                                  Allied Health Diagnostic, Intervention, and Treatment Professions.                                                    Associate's Degree
+                                                                       Allied Health and Medical Assisting Services.                                                    Associate's Degree
+                                                                 Business Administration, Management and Operations.                                                    Associate's Degree
+                                                                 Business Operations Support and Assistant Services.                                                    Associate's Degree
+                                                                                               Computer Programming.                                                    Associate's Degree
+                                                      Computer/Information Technology Administration and Management.                                                    Associate's Degree
+                                                                         Health and Medical Administrative Services.                                                    Associate's Degree
+Heating, Air Conditioning, Ventilation and Refrigeration Maintenance Technology/Technician (HAC, HACR, HVAC, HVACR).                                                    Associate's Degree
+                                                                     Industrial Production Technologies/Technicians.                                                    Associate's Degree
+                                                                                             Legal Support Services.                                                    Associate's Degree
+                                                          Liberal Arts and Sciences, General Studies and Humanities.                                                    Associate's Degree
+                                                                                                          Marketing.                                                    Associate's Degree
+                                  Registered Nursing, Nursing Administration, Nursing Research and Clinical Nursing.                                                    Associate's Degree
+                                                                                  Health Aides/Attendants/Orderlies. Non-Credential Program (Preparatory Coursework/Teacher Certification)
+                                                       Practical Nursing, Vocational Nursing and Nursing Assistants. Non-Credential Program (Preparatory Coursework/Teacher Certification)
+                                                                                    Accounting and Related Services.                                  Undergraduate Certificate or Diploma
+                                                  Allied Health Diagnostic, Intervention, and Treatment Professions.                                  Undergraduate Certificate or Diploma
+                                                                       Allied Health and Medical Assisting Services.                                  Undergraduate Certificate or Diploma
+                                                                 Business Administration, Management and Operations.                                  Undergraduate Certificate or Diploma
+                                                                 Business Operations Support and Assistant Services.                                  Undergraduate Certificate or Diploma
+                                                                                                         Carpenters.                                  Undergraduate Certificate or Diploma
+                                                Clinical/Medical Laboratory Science/Research and Allied Professions.                                  Undergraduate Certificate or Diploma
+                                                                                               Computer Programming.                                  Undergraduate Certificate or Diploma
+                                                      Computer/Information Technology Administration and Management.                                  Undergraduate Certificate or Diploma
+                                                                          Dietetics and Clinical Nutrition Services.                                  Undergraduate Certificate or Diploma
+                                                                       Electrical and Power Transmission Installers.                                  Undergraduate Certificate or Diploma
+                                                                                  Health Aides/Attendants/Orderlies.                                  Undergraduate Certificate or Diploma
+                                                                         Health and Medical Administrative Services.                                  Undergraduate Certificate or Diploma
+Heating, Air Conditioning, Ventilation and Refrigeration Maintenance Technology/Technician (HAC, HACR, HVAC, HVACR).                                  Undergraduate Certificate or Diploma
+                                                    Heavy/Industrial Equipment Maintenance Technologies/Technicians.                                  Undergraduate Certificate or Diploma
+                                                                                             Legal Support Services.                                  Undergraduate Certificate or Diploma
+                                                                                                          Marketing.                                  Undergraduate Certificate or Diploma
+                                                                         Plumbing and Related Water Supply Services.                                  Undergraduate Certificate or Diploma
+                                                       Practical Nursing, Vocational Nursing and Nursing Assistants.                                  Undergraduate Certificate or Diploma
+                                                                                            Precision Metal Working.                                  Undergraduate Certificate or Diploma
+                                                            Vehicle Maintenance and Repair Technologies/Technicians.                                  Undergraduate Certificate or Diploma
+
+--- DISTANCE value_counts ---
+DISTANCE
+1    158101
+0     28906
+3     23380
+2     17593
