@@ -250,6 +250,104 @@ def test_explain_exclusion_consistent_with_match(df):
 
 
 # ---------------------------------------------------------------------------
+# Part B: program_strength, selectivity, hidden_gems, ivy_league
+# ---------------------------------------------------------------------------
+
+from src.matcher import load_program_earnings, selectivity_tier, IVY_UNIT_IDS
+
+EARN_PATH = ROOT / "data/processed/program_earnings.csv"
+
+
+@pytest.fixture(scope="session")
+def program_earnings():
+    return load_program_earnings(str(EARN_PATH))
+
+
+def test_program_earnings_file(program_earnings):
+    """program_earnings.csv must exist and have the right columns and shape."""
+    if program_earnings is None:
+        pytest.skip("program_earnings.csv not found")
+    assert set(program_earnings.columns) >= {"unit_id", "cip4", "earn_mdn_4yr", "earn_n"}
+    assert len(program_earnings) > 1000, "Expected > 1000 rows"
+    assert (program_earnings["earn_mdn_4yr"] > 0).all(), "earn_mdn_4yr must be positive"
+    assert program_earnings["cip4"].str.len().eq(4).all(), "cip4 must be 4-char strings"
+
+
+def test_selectivity_tier_thresholds():
+    """selectivity_tier must map admit rates to correct tiers."""
+    assert selectivity_tier(0.05) == "Reach"
+    assert selectivity_tier(0.14) == "Reach"
+    assert selectivity_tier(0.15) == "Target"
+    assert selectivity_tier(0.50) == "Target"
+    assert selectivity_tier(0.51) == "Likely"
+    assert selectivity_tier(0.95) == "Likely"
+    assert selectivity_tier(float("nan")) == "Unknown"
+    assert selectivity_tier(None) == "Unknown"
+
+
+def test_ivy_league_unit_ids(df):
+    """All 8 Ivy League schools must be in the dataset with correct unit_ids."""
+    assert len(IVY_UNIT_IDS) == 8
+    found = df[df["unit_id"].isin(IVY_UNIT_IDS)]
+    assert len(found) == 8, f"Expected 8 Ivy League schools, found {len(found)}"
+    assert df["ivy_league"].sum() == 8, "ivy_league column must flag exactly 8 schools"
+
+
+def test_program_strength_in_match(df, program_earnings):
+    """match() with program_strength weight must not crash and produce valid scores."""
+    if program_earnings is None:
+        pytest.skip("program_earnings.csv not found")
+    client = {
+        "name": "prog-strength",
+        "require_f1": False, "max_budget": None, "budget_flex": 1.5,
+        "school_types": ["4-year"], "states": None, "city_groups": None,
+        "sport": None, "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": ["52"], "strict_major": False, "religion": None,
+        "hidden_gems_only": False,
+        "weights": {
+            "low_cost": 1, "grad_rate": 1, "sport_culture": 0, "athlete_opportunity": 0,
+            "international_community": 0, "open_admission": 0, "small_school": 0,
+            "entrepreneurship_program": 0, "program_strength": 5,
+        },
+    }
+    results, funnel = match(df, client, program_earnings=program_earnings)
+    assert not results.empty
+    assert results["match_score"].notna().all()
+
+
+def test_hidden_gems_only(df, program_earnings):
+    """hidden_gems_only filter must keep only non-Reach schools with high program strength."""
+    if program_earnings is None:
+        pytest.skip("program_earnings.csv not found")
+    client_no_gems = {
+        "name": "no-gems",
+        "require_f1": False, "max_budget": None, "budget_flex": 1.5,
+        "school_types": ["4-year"], "states": None, "city_groups": None,
+        "sport": None, "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": ["52"], "strict_major": False, "religion": None,
+        "hidden_gems_only": False,
+        "weights": {"low_cost": 1, "grad_rate": 0, "sport_culture": 0,
+                    "athlete_opportunity": 0, "international_community": 0,
+                    "open_admission": 0, "small_school": 0,
+                    "entrepreneurship_program": 0, "program_strength": 0},
+    }
+    client_gems = {**client_no_gems, "hidden_gems_only": True}
+    results_all, _ = match(df, client_no_gems, program_earnings=program_earnings)
+    results_gems, funnel = match(df, client_gems, program_earnings=program_earnings)
+    # Hidden gems must be a strict subset
+    assert len(results_gems) < len(results_all), "Hidden gems filter must reduce school count"
+    # No Reach schools in hidden gems
+    if "selectivity_tier" in results_gems.columns:
+        reach_in_gems = (results_gems["selectivity_tier"] == "Reach").sum()
+        assert reach_in_gems == 0, f"Hidden gems must not include Reach schools, found {reach_in_gems}"
+    # Funnel must show the hidden gems step
+    steps = [step for step, _ in funnel]
+    assert any("hidden gem" in s.lower() for s in steps), f"Expected hidden gems step in funnel: {steps}"
+
+
+# ---------------------------------------------------------------------------
 # App integration tests (Streamlit AppTest)
 # ---------------------------------------------------------------------------
 

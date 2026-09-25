@@ -10,7 +10,10 @@ import pydeck as pdk
 import streamlit as st
 import pandas as pd
 
-from src.matcher import load_data, match, explain_exclusion, SHOW_COLS
+from src.matcher import (
+    load_data, load_program_earnings, match, explain_exclusion,
+    SHOW_COLS, IVY_UNIT_IDS, ADMCON7_LABELS, selectivity_tier,
+)
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -24,9 +27,10 @@ PRIMARY_COLOR     = "#0B6E4F"
 PRIMARY_RGB       = [11, 110, 79]
 MAX_BUDGET_SLIDER = 95_000   # at this value the budget filter is disabled ("No limit")
 
-DATA_PATH = Path(__file__).parent / "data" / "processed" / "schools_with_majors.csv"
-CIP_PATH  = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
-AID_PATH  = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
+DATA_PATH     = Path(__file__).parent / "data" / "processed" / "schools_with_majors.csv"
+CIP_PATH      = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
+AID_PATH      = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
+EARN_PATH     = Path(__file__).parent / "data" / "processed" / "program_earnings.csv"
 
 MAJOR_OPTIONS = {
     "None":               None,
@@ -39,7 +43,8 @@ MAJOR_OPTIONS = {
 
 WEIGHT_KEYS = [
     "low_cost", "grad_rate", "sport_culture", "athlete_opportunity",
-    "international_community", "open_admission", "small_school", "entrepreneurship_program",
+    "international_community", "open_admission", "small_school",
+    "entrepreneurship_program", "program_strength",
 ]
 
 FEATURE_LABELS = {
@@ -51,6 +56,7 @@ FEATURE_LABELS = {
     "open_admission":          "Open admission",
     "small_school":            "Small school",
     "entrepreneurship_program":"Entrepreneurship program",
+    "program_strength":        "Strong program in my major",
 }
 
 FEATURE_HELP = {
@@ -62,6 +68,7 @@ FEATURE_HELP = {
     "open_admission":          "Schools that accept everyone rank higher (for weaker academic records).",
     "small_school":            "Smaller schools rank higher.",
     "entrepreneurship_program":"Schools offering an entrepreneurship degree rank higher.",
+    "program_strength":        "Where graduates in the chosen major earn the most, compared to other schools offering it. With no major chosen: graduates' earnings overall.",
 }
 
 SLIDER_OPTIONS = ["Don't care", "A little", "Somewhat", "Important", "Very important", "Top priority"]
@@ -70,23 +77,28 @@ WORD_TO_INT    = {w: i for i, w in enumerate(SLIDER_OPTIONS)}
 PRESETS = {
     "Balanced": {
         "low_cost": 5, "grad_rate": 3, "sport_culture": 2, "athlete_opportunity": 4,
-        "international_community": 3, "open_admission": 0, "small_school": 1, "entrepreneurship_program": 2,
+        "international_community": 3, "open_admission": 0, "small_school": 1,
+        "entrepreneurship_program": 2, "program_strength": 3,
     },
     "Budget first": {
         "low_cost": 5, "grad_rate": 2, "sport_culture": 0, "athlete_opportunity": 1,
-        "international_community": 2, "open_admission": 0, "small_school": 0, "entrepreneurship_program": 0,
+        "international_community": 2, "open_admission": 0, "small_school": 0,
+        "entrepreneurship_program": 0, "program_strength": 1,
     },
     "Athlete first": {
         "low_cost": 3, "grad_rate": 1, "sport_culture": 3, "athlete_opportunity": 5,
-        "international_community": 2, "open_admission": 0, "small_school": 0, "entrepreneurship_program": 0,
+        "international_community": 2, "open_admission": 0, "small_school": 0,
+        "entrepreneurship_program": 0, "program_strength": 1,
     },
     "Academics first": {
         "low_cost": 2, "grad_rate": 5, "sport_culture": 0, "athlete_opportunity": 0,
-        "international_community": 3, "open_admission": 0, "small_school": 1, "entrepreneurship_program": 1,
+        "international_community": 3, "open_admission": 0, "small_school": 1,
+        "entrepreneurship_program": 1, "program_strength": 5,
     },
     "Future entrepreneur": {
         "low_cost": 3, "grad_rate": 3, "sport_culture": 0, "athlete_opportunity": 0,
-        "international_community": 3, "open_admission": 0, "small_school": 0, "entrepreneurship_program": 5,
+        "international_community": 3, "open_admission": 0, "small_school": 0,
+        "entrepreneurship_program": 5, "program_strength": 2,
     },
 }
 
@@ -182,22 +194,23 @@ def affil_label(raw) -> str:
 
 # Default sidebar values — used both for first load and "Clear all filters".
 DEFAULTS = {
-    "sb_budget":       MAX_BUDGET_SLIDER,
-    "sb_school_types": ["2-year", "4-year"],
-    "sb_states":       [],
-    "sb_city_groups":  [],
-    "sb_plays_sport":  False,
-    "sb_sport":        "Soccer",
-    "sb_gender":       "men",
-    "sb_scholarship":  False,
-    "sb_major":        "None",
-    "sb_affil":        "Any",
-    "sb_budget_flex":  1.5,
-    "sb_grad_4yr":     0,
-    "sb_grad_2yr":     0,
-    "sb_strict_major": False,
-    "sb_require_f1":   False,
-    "preset_select":   "Balanced",
+    "sb_budget":        MAX_BUDGET_SLIDER,
+    "sb_school_types":  ["2-year", "4-year"],
+    "sb_states":        [],
+    "sb_city_groups":   [],
+    "sb_plays_sport":   False,
+    "sb_sport":         "Soccer",
+    "sb_gender":        "men",
+    "sb_scholarship":   False,
+    "sb_major":         "None",
+    "sb_affil":         "Any",
+    "sb_budget_flex":   1.5,
+    "sb_grad_4yr":      0,
+    "sb_grad_2yr":      0,
+    "sb_strict_major":  False,
+    "sb_require_f1":    False,
+    "sb_hidden_gems":   False,
+    "preset_select":    "Balanced",
 }
 
 
@@ -212,6 +225,11 @@ def get_cip_lookup() -> dict:
     """cip4 code → program name."""
     df = pd.read_csv(CIP_PATH, dtype=str)
     return dict(zip(df["cip4"], df["name"]))
+
+
+@st.cache_data
+def get_program_earnings(path_str: str):
+    return load_program_earnings(path_str)
 
 
 @st.cache_data
@@ -234,9 +252,10 @@ def get_intl_aid() -> pd.DataFrame:
     return aid
 
 
-df         = get_data(os.path.getmtime(DATA_PATH))
-cip_lookup = get_cip_lookup()
-intl_aid   = get_intl_aid()
+df               = get_data(os.path.getmtime(DATA_PATH))
+cip_lookup       = get_cip_lookup()
+intl_aid         = get_intl_aid()
+program_earnings = get_program_earnings(str(EARN_PATH))
 
 if not intl_aid.empty:
     df = df.merge(intl_aid, left_on="unit_id", right_on="unitid", how="left")
@@ -433,6 +452,76 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
     else:
         st.caption("No program data available in the College Scorecard for this school.")
 
+    # Admissions
+    st.subheader("Admissions", anchor=False)
+    admit = row.get("admit_rate")
+    tier = row.get("selectivity_tier") or selectivity_tier(admit)
+    tier_color = {"Reach": "red", "Target": "orange", "Likely": "green"}.get(tier, "gray")
+    admit_str = f"{admit:.0%}" if pd.notna(admit) else "—"
+    st.markdown(f"**Selectivity:** :{tier_color}-badge[{tier}]  ·  Admit rate: {admit_str}")
+    st.caption(
+        "Selectivity is based on admit rate only; it doesn't know the student's grades."
+    )
+    test_raw = row.get("test_policy")
+    if pd.notna(test_raw):
+        try:
+            test_label = ADMCON7_LABELS.get(int(test_raw), f"Code {int(test_raw)}")
+        except (TypeError, ValueError):
+            test_label = str(test_raw)
+        st.markdown(f"**Test score policy:** {test_label}")
+    r25 = row.get("sat_read_25")
+    r75 = row.get("sat_read_75")
+    m25 = row.get("sat_math_25")
+    m75 = row.get("sat_math_75")
+    sat_parts = []
+    if pd.notna(r25) and pd.notna(r75):
+        sat_parts.append(f"Reading: {int(r25)}–{int(r75)}")
+    if pd.notna(m25) and pd.notna(m75):
+        sat_parts.append(f"Math: {int(m25)}–{int(m75)}")
+    if sat_parts:
+        st.markdown("**SAT 25th–75th percentile:** " + "  ·  ".join(sat_parts))
+    if row.get("ivy_league") or (row.get("unit_id") in IVY_UNIT_IDS):
+        st.info(
+            "No athletic scholarships; financial aid is need-based only.",
+            icon="🏛️",
+        )
+
+    # Program outcomes
+    unit_id = row.get("unit_id")
+    if program_earnings is not None and unit_id is not None:
+        st.subheader("Program outcomes", anchor=False)
+        school_earn = program_earnings[program_earnings["unit_id"] == unit_id]
+        if not school_earn.empty:
+            if major_prefixes:
+                matched = school_earn[school_earn["cip4"].apply(
+                    lambda c: any(c.startswith(p) for p in major_prefixes)
+                )]
+                if matched.empty:
+                    st.caption("No earnings data for this major at this school.")
+                else:
+                    # Weighted median across matched programs
+                    total_earn = (matched["earn_mdn_4yr"] * matched["earn_n"]).sum()
+                    total_n = matched["earn_n"].sum()
+                    avg_earn = total_earn / total_n if total_n > 0 else float("nan")
+                    st.metric(
+                        "Graduates' median earnings 4 yrs after (this major)",
+                        f"${avg_earn:,.0f}" if pd.notna(avg_earn) else "—",
+                    )
+                    st.caption(
+                        "Earnings cover graduates who received U.S. federal aid; "
+                        "small programs are hidden for privacy."
+                    )
+            else:
+                all_earn = school_earn["earn_mdn_4yr"].median()
+                st.metric(
+                    "Graduates' median earnings 4 yrs after (all programs)",
+                    f"${all_earn:,.0f}" if pd.notna(all_earn) else "—",
+                )
+                st.caption(
+                    "Earnings cover graduates who received U.S. federal aid; "
+                    "small programs are hidden for privacy."
+                )
+
     # Website
     website = row.get("website")
     if pd.notna(website) and website:
@@ -525,6 +614,15 @@ with st.sidebar:
         )
         require_f1 = st.checkbox("Require F-1 eligibility (SEVP certified)", key="sb_require_f1")
 
+    hidden_gems = st.toggle(
+        "Hidden gems only",
+        key="sb_hidden_gems",
+        help=(
+            "Schools with top-quarter graduate outcomes that aren't ultra-selective, "
+            "often great schools families abroad haven't heard of."
+        ),
+    )
+
     st.divider()
 
     st.header("What matters most")
@@ -579,6 +677,7 @@ client = {
     "majors":                    MAJOR_OPTIONS[major_label],
     "strict_major":              strict_major,
     "religion":                  religion_key,
+    "hidden_gems_only":          hidden_gems,
     "weights":                   weights,
 }
 
@@ -593,7 +692,7 @@ else:
     df_for_match = df
 
 # ── Run matcher ────────────────────────────────────────────────────────────────
-results, funnel = match(df_for_match, client)
+results, funnel = match(df_for_match, client, program_earnings=program_earnings)
 
 # Restore original sticker cost for display; keep est_net_cost alongside.
 if has_aid_estimate.any() and not results.empty:
@@ -770,6 +869,13 @@ with tab_find:
                         row_affil = affil_label(row.get("religious_affil"))
                         if row_affil:
                             badges.append((row_affil, "gray"))
+                        # Selectivity badge
+                        tier = row.get("selectivity_tier") or selectivity_tier(row.get("admit_rate"))
+                        tier_color = {"Reach": "red", "Target": "orange", "Likely": "green"}.get(tier, "gray")
+                        badges.append((tier, tier_color))
+                        # Ivy League badge
+                        if row.get("ivy_league") or row.get("unit_id") in IVY_UNIT_IDS:
+                            badges.append(("Ivy League", "violet"))
                         st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
 
                         w1, w2 = split_reasons(row["top_reasons"])
@@ -928,6 +1034,29 @@ mostly because of a preference you don't actually care about, lower that weight 
     for k in WEIGHT_KEYS:
         with st.expander(FEATURE_LABELS[k]):
             st.markdown(FEATURE_HELP[k])
+
+    # ── Hidden gems ───────────────────────────────────────────────────────────
+    st.header("Hidden gems filter", anchor=False)
+    st.markdown(
+        """
+**What counts as a hidden gem?** A school where:
+1. Graduates in your chosen major (or all graduates, if no major is chosen) earn in the
+   **top 25% across all schools** that offer that major — and
+2. The school is **not ultra-selective** (admit rate ≥ 15%).
+
+The idea: selective schools already have strong brand recognition. Hidden gems are less-known schools
+where the data shows graduates do as well or better — often because the programs are excellent,
+the cost is lower, or the environment is a better fit.
+
+**Caveats:**
+- Earnings are not the same as quality. Selective schools admit students who'd earn well anywhere;
+  their graduates' high earnings partly reflect who they admitted, not what the school taught.
+- Earnings vary a lot by region — a school in San Francisco will look stronger than an identical
+  school in rural Alabama simply because Bay Area salaries are higher.
+- Earnings data covers graduates who received U.S. federal aid. International students and
+  students at very small programs may not be represented.
+        """
+    )
 
     # ── Where the data comes from ─────────────────────────────────────────────
     st.header("Where the data comes from", anchor=False)

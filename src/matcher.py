@@ -19,6 +19,27 @@ _REQUIRED_COLS = [
     "has_transfer_track", "religious_affil",
 ]
 
+# unit_ids for the 8 Ivy League schools.
+IVY_UNIT_IDS = {
+    130794,   # Yale University
+    166027,   # Harvard University
+    182670,   # Dartmouth College
+    186131,   # Princeton University
+    190150,   # Columbia University in the City of New York
+    190415,   # Cornell University
+    215062,   # University of Pennsylvania
+    217156,   # Brown University
+}
+
+# ADMCON7 codes → human-readable test policy labels (per data dictionary)
+ADMCON7_LABELS = {
+    1: "Required",
+    2: "Recommended",
+    3: "Neither required nor recommended",
+    4: "Do not know",
+    5: "Considered but not required",
+}
+
 # Columns shown in results tables (same list as notebook 04 cell 3).
 SHOW_COLS = [
     "name", "state", "school_type", "association",
@@ -26,6 +47,84 @@ SHOW_COLS = [
     "pct_international", "athlete_share",
     "offers_entrepreneurship", "match_score", "top_reasons",
 ]
+
+
+def load_program_earnings(
+    path="data/processed/program_earnings.csv",
+) -> pd.DataFrame | None:
+    """Load program_earnings.csv if it exists; return None otherwise."""
+    import os
+    if not os.path.exists(path):
+        return None
+    pe = pd.read_csv(path, dtype={"cip4": str})
+    pe["unit_id"] = pd.to_numeric(pe["unit_id"], errors="coerce")
+    pe["earn_mdn_4yr"] = pd.to_numeric(pe["earn_mdn_4yr"], errors="coerce")
+    pe["earn_n"] = pd.to_numeric(pe["earn_n"], errors="coerce").fillna(1)
+    # Ensure cip4 is always zero-padded 4-char string
+    pe["cip4"] = pe["cip4"].apply(lambda x: str(x).zfill(4) if pd.notna(x) else x)
+    return pe.dropna(subset=["unit_id", "earn_mdn_4yr"])
+
+
+def selectivity_tier(admit_rate) -> str:
+    """Classify a school by admit rate into Reach / Target / Likely / Unknown."""
+    if pd.isna(admit_rate):
+        return "Unknown"
+    if admit_rate == 0.0:
+        return "Likely"   # open admission stored as 0 in the data
+    if admit_rate < 0.15:
+        return "Reach"
+    if admit_rate <= 0.50:
+        return "Target"
+    return "Likely"
+
+
+def _program_strength_percentiles(
+    df: pd.DataFrame,
+    major_prefixes: list[str] | None,
+    program_earnings: pd.DataFrame | None,
+) -> pd.Series:
+    """
+    Return a 0–1 program-strength percentile for each row in df.
+
+    With a major: earnings-weighted average of earn_mdn_4yr for programs matching the
+    major prefix, percentile-ranked among schools that offer that major.
+    No major: percentile of median_earnings_10yr (institution-level).
+    Missing / 2-year schools with no earnings = 0.5.
+    """
+    result = pd.Series(0.5, index=df.index)
+
+    if not major_prefixes or program_earnings is None:
+        # Institution-level earnings percentile
+        if "median_earnings_10yr" in df.columns:
+            ranked = df["median_earnings_10yr"].rank(pct=True)
+            result = ranked.fillna(0.5)
+        return result
+
+    # Build weighted-average earnings per school for the matching major prefix
+    # Limit to bachelor's programs matching any prefix
+    def _prefix_match(cip4: str) -> bool:
+        return any(cip4.startswith(p) for p in major_prefixes)
+
+    pe = program_earnings[program_earnings["cip4"].apply(_prefix_match)].copy()
+    if pe.empty:
+        return result
+
+    # Weighted average earn_mdn_4yr per school
+    pe["weighted"] = pe["earn_mdn_4yr"] * pe["earn_n"]
+    agg = pe.groupby("unit_id").agg(
+        total_weighted=("weighted", "sum"),
+        total_n=("earn_n", "sum"),
+    )
+    agg = agg[agg["total_n"] > 0]
+    agg["avg_earn"] = agg["total_weighted"] / agg["total_n"]
+
+    # Percentile among schools that have earnings for this major
+    agg["pct"] = agg["avg_earn"].rank(pct=True)
+
+    # Map back to df rows via unit_id
+    unit_to_pct = agg["pct"].to_dict()
+    result = df["unit_id"].map(unit_to_pct).fillna(0.5)
+    return result
 
 
 def load_data(path="data/processed/schools_with_majors.csv") -> pd.DataFrame:
@@ -51,10 +150,20 @@ def load_data(path="data/processed/schools_with_majors.csv") -> pd.DataFrame:
                 return k.capitalize()
 
     df["city_group"] = df["city_size"].apply(city_group)
+
+    # Derived columns
+    df["selectivity_tier"] = df["admit_rate"].apply(selectivity_tier)
+    df["ivy_league"] = df["unit_id"].isin(IVY_UNIT_IDS)
+
     return df
 
 
-def match(df: pd.DataFrame, client: dict, top_n: int | None = None):
+def match(
+    df: pd.DataFrame,
+    client: dict,
+    top_n: int | None = None,
+    program_earnings: pd.DataFrame | None = None,
+):
     """
     Apply hard filters then rank by weighted score (verbatim from notebook 04 cell 3).
 
@@ -149,6 +258,14 @@ def match(df: pd.DataFrame, client: dict, top_n: int | None = None):
         c = c[c.apply(major_ok, axis=1)]
         funnel.append((f"After offers major {prefixes}", len(c)))
 
+    if client.get("hidden_gems_only"):
+        # Pre-compute program_strength percentile on the filtered pool to apply threshold
+        _pg_strength = _program_strength_percentiles(c, client.get("majors"), program_earnings)
+        _selectivity = c["selectivity_tier"] if "selectivity_tier" in c.columns else c["admit_rate"].apply(selectivity_tier)
+        mask = (_pg_strength >= 0.75) & (_selectivity != "Reach")
+        c = c[mask]
+        funnel.append(("After hidden gems filter", len(c)))
+
     if c.empty:
         return c, funnel
 
@@ -162,6 +279,7 @@ def match(df: pd.DataFrame, client: dict, top_n: int | None = None):
     f["open_admission"] = c["open_admission"].astype(float)
     f["small_school"] = 1 - c["undergrads"].rank(pct=True)          # smaller = higher
     f["entrepreneurship_program"] = c["offers_entrepreneurship"].astype(float)
+    f["program_strength"] = _program_strength_percentiles(c, client.get("majors"), program_earnings)
     f = f.fillna(0.5)
 
     # --- 3. Weighted score 0-100 + the 2 features that contributed most ---
@@ -180,12 +298,19 @@ def match(df: pd.DataFrame, client: dict, top_n: int | None = None):
     return results, funnel
 
 
-def explain_exclusion(row: pd.Series, client: dict) -> list[str]:
+def explain_exclusion(
+    row: pd.Series,
+    client: dict,
+    program_earnings: pd.DataFrame | None = None,
+    full_df: pd.DataFrame | None = None,
+) -> list[str]:
     """
     Return a list of plain-English reasons why *row* fails the hard filters in *client*.
 
     An empty list means the school passes all filters (it would appear in match() results).
     Reuses the exact same rules as match() so the two can never disagree.
+
+    full_df is required only when hidden_gems_only=True (needed to compute percentile rank).
     """
     reasons = []
 
@@ -282,5 +407,18 @@ def explain_exclusion(row: pd.Series, client: dict) -> list[str]:
                     not strict and row.get("has_transfer_track")
                 ):
                     reasons.append(f"Doesn't offer {', '.join(prefixes)} programs")
+
+    if client.get("hidden_gems_only"):
+        admit = row.get("admit_rate")
+        tier = row.get("selectivity_tier") or selectivity_tier(admit)
+        if tier == "Reach":
+            rate_str = f"{admit:.0%}" if pd.notna(admit) else "unknown"
+            reasons.append(f"Highly selective (admit rate {rate_str})")
+        elif full_df is not None:
+            # Compute program_strength percentile for this row against the full pool
+            ps_series = _program_strength_percentiles(full_df, client.get("majors"), program_earnings)
+            ps_val = ps_series.get(row.name, 0.5)
+            if ps_val < 0.75:
+                reasons.append("Not a hidden gem: graduate outcomes below the top quarter")
 
     return reasons
