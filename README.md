@@ -15,3 +15,15 @@ This project matches Brazilian and other international student-athletes to US co
 | `02_explore` | Exploratory charts: international student cost by school type, distribution of international share, top schools by % international |
 | `03_athletics` | Joins EADA data, builds athletic aid tier, association group, sport culture percentile, saves `schools_with_athletics.csv` |
 | `04_match` | Client intake dictionary → hard filters → weighted score → ranked shortlist |
+| `05_sevp_link` | Links schools to the SEVP certified-institution list; flags F-1 eligibility; saves `schools_with_sevp.csv` |
+
+## Known limitations
+
+- Costs are sticker prices before scholarships; no public data on what international students actually pay.
+- 2-year grad rates understate success — early transfers count as non-completers.
+- Athletic aid is reported per gender, not per sport.
+- "Sport culture" is proxied by total athletics spending, not fame directly.
+- Match scores are percentiles relative to each client's filtered pool, not absolute quality.
+- SEVP list is extracted from a PDF: ~0.2% of rows are unrecoverable (NJ/VT/ME prefix collisions); ~1.5% of schools are flagged as likely linkage misses (aliases, small institutions); manual alias table in `notebooks/05_sevp_link.ipynb`.
+- Online-only units are excluded from F-1 eligibility.
+- EADA multi-division schools ("Other") are remapped by keyword; ~5 multi-division NCAA schools remain grouped as "Other small-college".
