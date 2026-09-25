@@ -249,6 +249,64 @@ def test_explain_exclusion_consistent_with_match(df):
     )
 
 
+def test_unknown_cost_low_cost_score(df):
+    """Schools with unknown cost must score 0.3 on low_cost (not 0.5) so they
+    don't headline the list when the user cares about price."""
+    import numpy as np
+    unknown_cost = df[df["cost_international"].isna()]
+    if unknown_cost.empty:
+        pytest.fail("No unknown-cost schools in dataset — test setup error")
+    client = {
+        "name": "unknown-cost",
+        "require_f1": False, "max_budget": None, "budget_flex": 1.5,
+        "school_types": ["2-year", "4-year"], "states": None, "city_groups": None,
+        "sport": None, "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": None, "strict_major": False, "religion": None,
+        "hidden_gems_only": False,
+        "weights": {"low_cost": 5, "grad_rate": 0, "sport_culture": 0,
+                    "athlete_opportunity": 0, "international_community": 0,
+                    "open_admission": 0, "small_school": 0,
+                    "entrepreneurship_program": 0},
+    }
+    results, _ = match(df, client)
+    unknown_in_results = results[results["cost_international"].isna()]
+    assert not unknown_in_results.empty, "Expected some unknown-cost schools in results"
+    # With weight=5 on low_cost and all others=0, score = low_cost * (5/5) * 100 = low_cost * 100
+    # Unknown-cost schools get 0.3, so their score should be near 30.0
+    for _, row in unknown_in_results.head(5).iterrows():
+        assert abs(row["match_score"] - 30.0) < 1.0, (
+            f"{row['name']}: expected score ~30.0 (low_cost=0.3), got {row['match_score']}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Data-file tracking: every file the app loads must be committed to git
+# ---------------------------------------------------------------------------
+
+def test_required_data_files_tracked():
+    """Every data file app.py loads at startup must be tracked by git (committed).
+
+    This catches the 'pipeline regenerated a file locally but forgot to git add'
+    failure mode that caused the deploy outage.
+    """
+    import subprocess
+    tracked = set(
+        subprocess.check_output(["git", "ls-files"], cwd=ROOT).decode().splitlines()
+    )
+    required = [
+        "data/processed/schools_with_majors.csv",
+        "data/processed/cip_names.csv",
+        "data/processed/program_earnings.csv",
+        # intl_aid is optional (app handles its absence), so not required here
+    ]
+    missing = [f for f in required if f not in tracked]
+    assert not missing, (
+        f"Required data files not tracked by git: {missing}\n"
+        "Run: git add <file> && git commit"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Part B: program_strength, selectivity, hidden_gems, ivy_league
 # ---------------------------------------------------------------------------
@@ -265,8 +323,10 @@ def program_earnings():
 
 def test_program_earnings_file(program_earnings):
     """program_earnings.csv must exist and have the right columns and shape."""
-    if program_earnings is None:
-        pytest.skip("program_earnings.csv not found")
+    assert program_earnings is not None, (
+        "program_earnings.csv is missing — run notebook 06 to regenerate it, "
+        "then commit the file (it must be tracked by git)."
+    )
     assert set(program_earnings.columns) >= {"unit_id", "cip4", "earn_mdn_4yr", "earn_n"}
     assert len(program_earnings) > 1000, "Expected > 1000 rows"
     assert (program_earnings["earn_mdn_4yr"] > 0).all(), "earn_mdn_4yr must be positive"
@@ -295,8 +355,7 @@ def test_ivy_league_unit_ids(df):
 
 def test_program_strength_in_match(df, program_earnings):
     """match() with program_strength weight must not crash and produce valid scores."""
-    if program_earnings is None:
-        pytest.skip("program_earnings.csv not found")
+    assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
     client = {
         "name": "prog-strength",
         "require_f1": False, "max_budget": None, "budget_flex": 1.5,
@@ -318,8 +377,7 @@ def test_program_strength_in_match(df, program_earnings):
 
 def test_hidden_gems_only(df, program_earnings):
     """hidden_gems_only filter must keep only non-Reach schools with high program strength."""
-    if program_earnings is None:
-        pytest.skip("program_earnings.csv not found")
+    assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
     client_no_gems = {
         "name": "no-gems",
         "require_f1": False, "max_budget": None, "budget_flex": 1.5,

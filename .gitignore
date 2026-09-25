@@ -3,6 +3,7 @@ data/raw/
 data/processed/*
 !data/processed/schools_with_majors.csv
 !data/processed/cip_names.csv
+!data/processed/program_earnings.csv
 # data/manual/ is tracked (manually curated per-school aid data)
 .ipynb_checkpoints/
 .DS_Store

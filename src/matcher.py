@@ -272,6 +272,9 @@ def match(
     # --- 2. Features on a 0-1 scale (percentile among remaining schools). Missing = 0.5 neutral. ---
     f = pd.DataFrame(index=c.index)
     f["low_cost"] = 1 - c["cost_international"].rank(pct=True)     # cheaper = higher
+    # Schools with no published price get 0.3 (slightly below neutral) so they don't
+    # headline the list when a user cares about cost — but they're not buried either.
+    f["low_cost"] = f["low_cost"].fillna(0.3)
     f["grad_rate"] = c["grad_rate"].rank(pct=True)
     f["sport_culture"] = c["sport_culture_pct"] / 100              # already a percentile
     f["athlete_opportunity"] = c["athlete_share"].rank(pct=True)

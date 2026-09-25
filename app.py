@@ -3,6 +3,7 @@ College Match — Streamlit demo.
 Sidebar inputs → src/matcher.py → metrics, cards, detail dialog, compare, map, full table.
 """
 
+import importlib
 import os
 from pathlib import Path
 import altair as alt
@@ -10,6 +11,9 @@ import pydeck as pdk
 import streamlit as st
 import pandas as pd
 
+import src.matcher
+importlib.reload(src.matcher)          # force a fresh module on every run so
+                                       # Streamlit Cloud never serves a stale cache
 from src.matcher import (
     load_data, load_program_earnings, match, explain_exclusion,
     SHOW_COLS, IVY_UNIT_IDS, ADMCON7_LABELS, selectivity_tier,
@@ -869,10 +873,11 @@ with tab_find:
                         row_affil = affil_label(row.get("religious_affil"))
                         if row_affil:
                             badges.append((row_affil, "gray"))
-                        # Selectivity badge
+                        # Selectivity badge (skip when admit rate is unknown)
                         tier = row.get("selectivity_tier") or selectivity_tier(row.get("admit_rate"))
-                        tier_color = {"Reach": "red", "Target": "orange", "Likely": "green"}.get(tier, "gray")
-                        badges.append((tier, tier_color))
+                        if tier != "Unknown":
+                            tier_color = {"Reach": "red", "Target": "orange", "Likely": "green"}[tier]
+                            badges.append((tier, tier_color))
                         # Ivy League badge
                         if row.get("ivy_league") or row.get("unit_id") in IVY_UNIT_IDS:
                             badges.append(("Ivy League", "violet"))

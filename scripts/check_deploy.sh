@@ -46,10 +46,28 @@ echo "Installed packages:"
 "$VENV_DIR/bin/pip" list --format=columns | grep -E "streamlit|pandas|numpy|altair|pydeck|pytest"
 echo ""
 
-# ── 3. Run pytest in the cloned repo ─────────────────────────────────────────
-echo "--- Step 3: pytest ---"
+# ── 3. Run pytest — skips are treated as failures ────────────────────────────
+echo "--- Step 3: pytest (skips = failures) ---"
 cd "$REPO_DIR"
-"$VENV_DIR/bin/python" -m pytest tests/ -v
+
+PYTEST_OUT="$TMPDIR_BASE/pytest.txt"
+"$VENV_DIR/bin/python" -m pytest tests/ -v 2>&1 | tee "$PYTEST_OUT"
+PYTEST_EXIT=${PIPESTATUS[0]}
+
+# Fail if any test was skipped — a skip in the deploy environment means a
+# required data file or dependency is absent from the repo.
+if grep -qE "skipped" "$PYTEST_OUT"; then
+    echo ""
+    echo "ERROR: test suite had skips — every test must pass in the deploy environment."
+    echo "Commit all required data files and re-run."
+    exit 1
+fi
+
+if [ "$PYTEST_EXIT" -ne 0 ]; then
+    echo ""
+    echo "ERROR: pytest exited $PYTEST_EXIT"
+    exit "$PYTEST_EXIT"
+fi
 
 echo ""
 echo "=== check_deploy.sh PASSED ==="
