@@ -19,12 +19,13 @@ st.set_page_config(
 )
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-PRIMARY_COLOR = "#0B6E4F"
-PRIMARY_RGB   = [11, 110, 79]
+PRIMARY_COLOR     = "#0B6E4F"
+PRIMARY_RGB       = [11, 110, 79]
+MAX_BUDGET_SLIDER = 95_000   # at this value the budget filter is disabled ("No limit")
 
-DATA_PATH     = Path(__file__).parent / "data" / "processed" / "schools_with_majors.csv"
-CIP_PATH      = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
-AID_PATH      = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
+DATA_PATH = Path(__file__).parent / "data" / "processed" / "schools_with_majors.csv"
+CIP_PATH  = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
+AID_PATH  = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
 
 MAJOR_OPTIONS = {
     "None":               None,
@@ -40,7 +41,6 @@ WEIGHT_KEYS = [
     "international_community", "open_admission", "small_school", "entrepreneurship_program",
 ]
 
-# Single source of truth for human-readable feature names.
 FEATURE_LABELS = {
     "low_cost":                "Low cost",
     "grad_rate":               "Graduation rate",
@@ -91,7 +91,7 @@ PRESETS = {
 
 AID_TIERS = {"Athletic scholarships", "Mixed / verify"}
 
-# IPEDS RELAFFIL code → human-readable label (from College Scorecard data dictionary).
+# IPEDS RELAFFIL code → human-readable label (College Scorecard data dictionary).
 RELAFFIL_MAP: dict[int, str] = {
     22: "American Evangelical Lutheran Church",
     24: "African Methodist Episcopal Zion",
@@ -163,21 +163,41 @@ RELAFFIL_MAP: dict[int, str] = {
     110: "Orthodox Christian",
 }
 
-# Codes indicating no religious affiliation
 _NONE_CODES = {-1, -2}
-
-# Set of codes considered "any religious affiliation" (all positive codes)
-_RELIGIOUS_CODES = set(RELAFFIL_MAP.keys())
-# Catholic-specific
-_CATHOLIC_CODES = {30}
 
 
 def affil_label(raw) -> str:
-    """Return human-readable affiliation label for a raw RELAFFIL value."""
-    if pd.isna(raw) or int(raw) in _NONE_CODES:
-        return "None"
-    code = int(raw)
-    return RELAFFIL_MAP.get(code, f"Code {code}")
+    """Return display label for a raw RELAFFIL value; empty string when none/missing."""
+    try:
+        if pd.isna(raw):
+            return ""
+        code = int(raw)
+        if code in _NONE_CODES:
+            return ""
+        return RELAFFIL_MAP.get(code, f"Code {code}")
+    except (TypeError, ValueError):
+        return ""
+
+
+# Default sidebar values — used both for first load and "Clear all filters".
+DEFAULTS = {
+    "sb_budget":       MAX_BUDGET_SLIDER,
+    "sb_school_types": ["2-year", "4-year"],
+    "sb_states":       [],
+    "sb_city_groups":  [],
+    "sb_plays_sport":  False,
+    "sb_sport":        "Soccer",
+    "sb_gender":       "men",
+    "sb_scholarship":  False,
+    "sb_major":        "None",
+    "sb_affil":        "Any",
+    "sb_budget_flex":  1.5,
+    "sb_grad_4yr":     0,
+    "sb_grad_2yr":     0,
+    "sb_strict_major": False,
+    "sb_require_f1":   False,
+    "preset_select":   "Balanced",
+}
 
 
 # ── Data ───────────────────────────────────────────────────────────────────────
@@ -188,7 +208,7 @@ def get_data():
 
 @st.cache_data
 def get_cip_lookup() -> dict:
-    """cip4 code → program name (stripped trailing period)."""
+    """cip4 code → program name."""
     df = pd.read_csv(CIP_PATH, dtype=str)
     return dict(zip(df["cip4"], df["name"]))
 
@@ -201,7 +221,6 @@ def get_intl_aid() -> pd.DataFrame:
                                       "need_blind_intl", "pct_intl_aided", "avg_intl_award",
                                       "cds_year", "source_url"])
     aid = pd.read_csv(AID_PATH, comment="#")
-    # Drop rows without a numeric unitid (placeholder / comment rows)
     aid = aid[pd.to_numeric(aid["unitid"], errors="coerce").notna()].copy()
     aid["unitid"] = aid["unitid"].astype(int)
     aid["avg_intl_award"] = pd.to_numeric(aid["avg_intl_award"], errors="coerce")
@@ -218,19 +237,18 @@ df         = get_data()
 cip_lookup = get_cip_lookup()
 intl_aid   = get_intl_aid()
 
-# Left-join aid data onto main df (unit_id in df, unitid in aid file)
 if not intl_aid.empty:
     df = df.merge(intl_aid, left_on="unit_id", right_on="unitid", how="left")
     df["est_net_cost"] = df["cost_international"] - df["avg_intl_award"]
 else:
-    df["est_net_cost"]       = float("nan")
-    df["offers_intl_aid"]    = None
+    df["est_net_cost"]         = float("nan")
+    df["offers_intl_aid"]      = None
     df["meets_full_need_intl"] = None
-    df["need_blind_intl"]    = None
-    df["pct_intl_aided"]     = float("nan")
-    df["avg_intl_award"]     = float("nan")
-    df["cds_year"]           = None
-    df["source_url"]         = None
+    df["need_blind_intl"]      = None
+    df["pct_intl_aided"]       = float("nan")
+    df["avg_intl_award"]       = float("nan")
+    df["cds_year"]             = None
+    df["source_url"]           = None
 
 ALL_SPORTS = sorted({
     s.strip()
@@ -241,7 +259,11 @@ ALL_SPORTS = sorted({
 })
 ALL_STATES = sorted(df["state"].dropna().unique().tolist())
 
-# ── Session state for weight sliders ──────────────────────────────────────────
+# ── Session state ──────────────────────────────────────────────────────────────
+for k, v in DEFAULTS.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
 for k in WEIGHT_KEYS:
     if f"w_{k}" not in st.session_state:
         st.session_state[f"w_{k}"] = SLIDER_OPTIONS[PRESETS["Balanced"][k]]
@@ -252,6 +274,13 @@ def _apply_preset():
     if name in PRESETS:
         for k, v in PRESETS[name].items():
             st.session_state[f"w_{k}"] = SLIDER_OPTIONS[v]
+
+
+def _clear_filters():
+    for k, v in DEFAULTS.items():
+        st.session_state[k] = v
+    for k, v in PRESETS["Balanced"].items():
+        st.session_state[f"w_{k}"] = SLIDER_OPTIONS[v]
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -273,7 +302,6 @@ def _program_list(cips_str: str, major_prefixes):
         name = cip_lookup.get(code, code)
         is_match = bool(major_prefixes and any(code.startswith(p) for p in major_prefixes))
         out.append((is_match, name))
-    # matching programs first
     return sorted(out, key=lambda x: (not x[0], x[1]))
 
 
@@ -287,10 +315,11 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
     enrollment = row.get("undergrads")
     enrollment_str = f"{int(enrollment):,}" if pd.notna(enrollment) else "—"
     row_affil_label = affil_label(row.get("religious_affil"))
-    affil_str = f"  ·  {row_affil_label}" if row_affil_label != "None" else ""
+    affil_str = f"  ·  {row_affil_label}" if row_affil_label else ""
+    f1_str = "F-1 certified" if row.get("sevp_certified") else "Not F-1 certified"
     st.caption(
         f"📍 {row['city']}, {row['state']}  ·  {row['school_type']}  ·  "
-        f"{row['association']}  ·  {city_size}{affil_str}\n"
+        f"{row['association']}  ·  {city_size}{affil_str}  ·  {f1_str}\n"
         f"👥 {enrollment_str} undergraduates"
     )
 
@@ -321,14 +350,17 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
         if row.get("need_blind_intl"):
             flags_aid.append("Need-blind admission")
         if pct_aided and pd.notna(pct_aided):
-            flags_aid.append(f"{pct_aided:.0%} of aided international undergrads receive aid")
+            flags_aid.append(f"{pct_aided:.0%} of international students receive aid")
+        else:
+            flags_aid.append("Aid share unknown")
         if flags_aid:
             st.markdown("  ·  ".join(flags_aid))
         caption_parts = []
         if cds_yr and str(cds_yr) not in ("None", "nan"):
             caption_parts.append(f"CDS year: {cds_yr}")
         st.caption(
-            "Source: Common Data Set (Section H6). " + ("  ·  ".join(caption_parts) if caption_parts else "")
+            "Source: Common Data Set (Section H6). "
+            + ("  ·  ".join(caption_parts) if caption_parts else "")
         )
         if src_url and str(src_url) not in ("None", "nan", "TODO"):
             st.link_button("View Common Data Set ↗", url=str(src_url))
@@ -353,11 +385,13 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
 
         if sports_list:
             st.markdown(f"**{selected_gender.capitalize()}'s sports offered:** " + " · ".join(sports_list))
+    else:
+        st.caption("No athletics reported for this school.")
 
     # Academics
     st.markdown("### Academics")
     grad = row.get("grad_rate")
-    grad_str = f"{grad:.0%}" if pd.notna(grad) else "Not reported"
+    grad_str = f"{grad:.0%}" if pd.notna(grad) else "—"
     if row["school_type"] == "2-year" and pd.notna(grad):
         grad_str += " *(understates success — students who transfer early count as non-completers)*"
     pct_intl = row.get("pct_international")
@@ -406,57 +440,89 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
+    st.button("Clear all filters", use_container_width=True, on_click=_clear_filters)
+
     st.header("Must-haves")
     st.caption("Schools that fail any of these are removed.")
 
-    max_budget = st.slider(
-        "Max the family can pay per year", 5_000, 80_000, 25_000, step=500, format="$%d",
+    budget_val = st.slider(
+        "Max the family can pay per year",
+        5_000, MAX_BUDGET_SLIDER, step=500, format="$%d",
+        key="sb_budget",
     )
+    if budget_val >= MAX_BUDGET_SLIDER:
+        st.caption("No limit — schools with unknown costs are included.")
+        max_budget = None
+    else:
+        st.caption(f"Budget: ${budget_val:,}/yr")
+        max_budget = budget_val
+
     school_types = st.multiselect(
-        "What type of school?", ["2-year", "4-year"], default=["2-year", "4-year"],
+        "What type of school?", ["2-year", "4-year"],
+        key="sb_school_types",
     )
-    states      = st.multiselect("Where? (leave empty for anywhere)", ALL_STATES, default=[])
+    states      = st.multiselect("Where? (leave empty for anywhere)", ALL_STATES, key="sb_states")
     city_groups = st.multiselect(
-        "City size? (leave empty for any)", ["City", "Suburb", "Town", "Rural"], default=[],
+        "City size? (leave empty for any)", ["City", "Suburb", "Town", "Rural"],
+        key="sb_city_groups",
     )
 
-    plays_sport = st.toggle("Does the student play a sport?", value=True)
+    plays_sport = st.toggle("Does the student play a sport?", key="sb_plays_sport")
     if plays_sport:
-        sport_choice      = st.selectbox("Sport", ALL_SPORTS, index=ALL_SPORTS.index("Soccer"))
-        gender            = st.radio("Gender", ["men", "women"], index=0)
-        needs_scholarship = st.checkbox("Needs an athletic scholarship", value=True)
+        sport_choice = st.selectbox(
+            "Sport", ALL_SPORTS,
+            index=ALL_SPORTS.index(st.session_state["sb_sport"])
+                  if st.session_state["sb_sport"] in ALL_SPORTS else 0,
+            key="sb_sport",
+        )
+        gender            = st.radio("Gender", ["men", "women"], key="sb_gender")
+        needs_scholarship = st.checkbox("Needs an athletic scholarship", key="sb_scholarship")
     else:
         sport_choice      = None
-        gender            = "men"
+        gender            = st.session_state.get("sb_gender", "men")
         needs_scholarship = False
 
-    major_label = st.selectbox("Intended major", list(MAJOR_OPTIONS.keys()), index=1)
+    major_label = st.selectbox("Intended major", list(MAJOR_OPTIONS.keys()), key="sb_major")
 
     affil_filter = st.selectbox(
         "Religious affiliation",
         ["Any", "Catholic", "Any religious", "Non-religious"],
-        help="'Any' shows all schools. 'Catholic' shows only Roman Catholic schools. "
-             "'Any religious' shows schools with any stated affiliation. "
-             "'Non-religious' shows schools with no stated affiliation.",
+        key="sb_affil",
+        help="'Any' shows all schools. 'Catholic' = Roman Catholic only. "
+             "'Any religious' = schools with a stated affiliation. "
+             "'Non-religious' = no stated affiliation.",
     )
+    _affil_map = {
+        "Any":           None,
+        "Catholic":      "catholic",
+        "Any religious": "any_religious",
+        "Non-religious": "non_religious",
+    }
+    religion_key = _affil_map[affil_filter]
 
     with st.expander("Advanced"):
         budget_flex = st.slider(
-            "Stretch budget for athletes (scholarships expected)", 1.0, 2.0, 1.5, step=0.1,
+            "Stretch budget for athletes (scholarships expected)", 1.0, 2.0, step=0.1,
             format="%.1f",
+            key="sb_budget_flex",
             help="1.5 = consider schools up to 50% over budget (the athlete may receive aid that closes the gap).",
         )
         min_grad_4yr = st.slider(
-            "Min grad rate — 4-year", 0, 100, 30, step=5, format="%d%%",
+            "Min grad rate — 4-year", 0, 100, step=5, format="%d%%",
+            key="sb_grad_4yr",
             help="4-year schools below this are excluded. Schools with unknown rates are kept.",
         )
-        min_grad_2yr  = st.slider("Min grad rate — 2-year", 0, 100, 20, step=5, format="%d%%")
+        min_grad_2yr  = st.slider(
+            "Min grad rate — 2-year", 0, 100, step=5, format="%d%%",
+            key="sb_grad_2yr",
+        )
         strict_major  = st.checkbox(
-            "Require exact major (don't count general transfer tracks)", value=False,
+            "Require exact major (don't count general transfer tracks)",
+            key="sb_strict_major",
             help="When checked, 2-year schools must offer the major as an associate degree; "
                  "a Liberal Arts transfer track no longer qualifies.",
         )
-        require_f1 = st.checkbox("Require F-1 eligibility (SEVP certified)", value=True)
+        require_f1 = st.checkbox("Require F-1 eligibility (SEVP certified)", key="sb_require_f1")
 
     st.divider()
 
@@ -499,7 +565,7 @@ with st.sidebar:
 client = {
     "name":                      "Streamlit session",
     "require_f1":                require_f1,
-    "max_budget":                max_budget,
+    "max_budget":                max_budget,           # None = no limit
     "budget_flex":               budget_flex,
     "school_types":              school_types if school_types else ["2-year", "4-year"],
     "states":                    states if states else None,
@@ -511,44 +577,28 @@ client = {
     "min_grad_rate_2yr":         min_grad_2yr / 100,
     "majors":                    MAJOR_OPTIONS[major_label],
     "strict_major":              strict_major,
+    "religion":                  religion_key,
     "weights":                   weights,
 }
 
-# ── Pre-filter: religious affiliation (hard filter applied before match()) ─────
-df_filtered = df.copy()
-if affil_filter == "Catholic":
-    df_filtered = df_filtered[df_filtered["religious_affil"].isin(_CATHOLIC_CODES)]
-elif affil_filter == "Any religious":
-    df_filtered = df_filtered[
-        df_filtered["religious_affil"].notna()
-        & ~df_filtered["religious_affil"].isin(_NONE_CODES)
-    ]
-elif affil_filter == "Non-religious":
-    df_filtered = df_filtered[
-        df_filtered["religious_affil"].isna()
-        | df_filtered["religious_affil"].isin(_NONE_CODES)
-    ]
-
-# ── Swap cost_international → est_net_cost where intl aid data is available ───
-# This lets matcher.py's budget filter use the estimated net cost without
-# changing the matcher itself. The original sticker cost stays in df for display.
-has_aid_estimate = df_filtered["est_net_cost"].notna()
+# ── Swap cost → est_net_cost where intl aid data is present ───────────────────
+has_aid_estimate = df["est_net_cost"].notna()
 if has_aid_estimate.any():
-    df_for_match = df_filtered.copy()
+    df_for_match = df.copy()
     df_for_match.loc[has_aid_estimate, "cost_international"] = df_for_match.loc[
         has_aid_estimate, "est_net_cost"
     ]
 else:
-    df_for_match = df_filtered
+    df_for_match = df
 
 # ── Run matcher ────────────────────────────────────────────────────────────────
 results, funnel = match(df_for_match, client, top_n=25)
 
-# Restore original cost_international in results (for display), but keep est_net_cost
-if has_aid_estimate.any():
-    orig_cost = df_filtered["cost_international"]
-    results["cost_international"] = results.index.map(orig_cost)
-    results["est_net_cost"] = results.index.map(df_filtered["est_net_cost"])
+# Restore original sticker cost for display; keep est_net_cost alongside.
+if has_aid_estimate.any() and not results.empty:
+    results = results.copy()
+    results["cost_international"] = results.index.map(df["cost_international"])
+    results["est_net_cost"]       = results.index.map(df["est_net_cost"])
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_find, tab_how = st.tabs(["Find schools", "How it works"])
@@ -558,17 +608,18 @@ tab_find, tab_how = st.tabs(["Find schools", "How it works"])
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_find:
 
-    # Header
     st.title("College Match")
     st.markdown(
         "Find U.S. colleges and junior colleges that fit an international student's "
         "budget, sport, major, and visa needs."
     )
 
-    # Metrics
-    m1, m2, m3 = st.columns(3)
+    # "Schools that fit" = last funnel step (all schools passing every hard filter)
+    schools_that_fit = funnel[-1][1] if funnel else 0
+
+    m1, m2, m3, m4 = st.columns(4)
     with m1:
-        st.metric("Schools that fit", len(results) if not results.empty else 0)
+        st.metric("Schools that fit", schools_that_fit)
     with m2:
         if not results.empty:
             median_cost = results["cost_international"].median()
@@ -581,7 +632,15 @@ with tab_find:
     with m3:
         if client.get("sport") and not results.empty:
             aid_count = results["athletic_aid_tier"].isin(AID_TIERS).sum()
-            st.metric("Offer athletic scholarships", aid_count)
+            st.metric("Offer athletic scholarships", int(aid_count))
+        else:
+            st.metric("Offer athletic scholarships", "—")
+    with m4:
+        if not results.empty:
+            f1_count = int(results["sevp_certified"].sum())
+            st.metric("F-1 certified", f1_count)
+        else:
+            st.metric("F-1 certified", "—")
 
     # Empty state
     if results.empty:
@@ -597,20 +656,35 @@ with tab_find:
                 with st.container(border=True):
                     rank = i + 1
                     st.markdown(f"**#{rank} · {row['name']}**")
-                    st.caption(f"{row['city']}, {row['state']}  ·  {row['school_type']}  ·  {row['association']}")
+                    st.caption(
+                        f"{row['city']}, {row['state']}  ·  {row['school_type']}  ·  "
+                        f"{row['association'] or '—'}"
+                    )
 
                     cost = row["cost_international"]
                     est  = row.get("est_net_cost")
                     has_est = pd.notna(est)
                     display_cost = est if has_est else cost
                     st.markdown(f"### {'$' + f'{display_cost:,.0f}' if pd.notna(display_cost) else '—'}")
-                    cost_caption = "per year · est. after intl aid" if has_est else "per year · sticker price before scholarships"
-                    st.caption(cost_caption)
+                    if has_est:
+                        pct_aided = row.get("pct_intl_aided")
+                        aided_note = (
+                            f" · {pct_aided:.0%} of internationals receive aid"
+                            if pd.notna(pct_aided)
+                            else " · aid share unknown"
+                        )
+                        st.caption(f"per year · Estimated cost if aided{aided_note}")
+                    else:
+                        st.caption("per year · sticker price before scholarships")
 
                     score = float(row["match_score"])
                     st.progress(score / 100, text=f"Match score: {score:.1f} / 100")
 
-                    badges = [("F-1 certified", "green")]
+                    badges = []
+                    if row.get("sevp_certified"):
+                        badges.append(("F-1 certified", "green"))
+                    else:
+                        badges.append(("Not F-1 certified", "red"))
                     if row.get("offers_intl_aid") is True:
                         badges.append(("Intl aid", "blue"))
                     elif row.get("athletic_aid_tier") in AID_TIERS:
@@ -620,7 +694,7 @@ with tab_find:
                     if row.get("school_type") == "2-year" and row.get("has_transfer_track"):
                         badges.append(("Transfer track", "violet"))
                     row_affil = affil_label(row.get("religious_affil"))
-                    if row_affil != "None":
+                    if row_affil:
                         badges.append((row_affil, "gray"))
                     st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
 
@@ -642,18 +716,21 @@ with tab_find:
             table = {}
             for _, r in sel.iterrows():
                 c_w1, c_w2 = split_reasons(r["top_reasons"])
-                cost  = r["cost_international"]
-                grad  = r["grad_rate"]
-                pct_i = r["pct_international"]
-                a_shr = r["athlete_share"]
+                cost      = r["cost_international"]
+                grad      = r["grad_rate"]
+                pct_i     = r["pct_international"]
+                a_shr     = r["athlete_share"]
+                aid_tier_val = r.get("athletic_aid_tier") or "No athletics"
+                aff = affil_label(r.get("religious_affil"))
                 table[r["name"]] = {
                     "Cost/yr":          f"${cost:,.0f}" if pd.notna(cost) else "—",
                     "Grad rate":        f"{grad:.0%}"   if pd.notna(grad) else "—",
                     "% International":  f"{pct_i:.0%}"  if pd.notna(pct_i) else "—",
                     "Athlete share":    f"{a_shr:.0%}"  if pd.notna(a_shr) else "—",
                     "Association":      r.get("association") or "—",
-                    "Aid tier":         r.get("athletic_aid_tier") or "—",
-                    "Affiliation":      affil_label(r.get("religious_affil")),
+                    "Aid tier":         aid_tier_val,
+                    "Affiliation":      aff or "—",
+                    "F-1 certified":    "Yes" if r.get("sevp_certified") else "No",
                     "Entrepreneurship": "Yes" if r["offers_entrepreneurship"] else "No",
                     "Score":            f"{r['match_score']:.1f}",
                     "Why #1":           c_w1,
@@ -830,12 +907,6 @@ mostly because of a preference you don't actually care about, lower that weight 
   ranked very well among the options that passed your filters. The same school might score 60
   in a different search with different filters or preferences.
 
-- **International aid figures are manually collected and may be outdated.** Aid data comes from
-  each school's Common Data Set (Section H6), entered by hand. Only a small number of schools
-  have been filed so far. Figures are per-school averages across all international aided students
-  — your actual award depends on your family's financial situation and the school's specific policy.
-  Always confirm with the school's financial aid office before making decisions.
-
 - **F-1 eligibility data has a lag.** The SEVP list was last downloaded in September 2026.
   A small number of schools may have been certified or decertified since then. Always confirm
   directly with the school's international admissions office.
@@ -843,6 +914,12 @@ mostly because of a preference you don't actually care about, lower that weight 
 - **Schools with no program data are still shown.** If a school has no entries in the College
   Scorecard's program data, it passes the major filter automatically (we don't know it doesn't
   offer your major — we just don't have data either way).
+
+- **International aid figures are manually collected and may be outdated.** Aid data comes from
+  each school's Common Data Set (Section H6), entered by hand. Only a small number of schools
+  have been filed so far. Figures are per-school averages across all international aided students
+  — your actual award depends on your family's financial situation and the school's specific policy.
+  Always confirm with the school's financial aid office before making decisions.
         """
     )
 

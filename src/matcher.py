@@ -1,11 +1,21 @@
 """
 Core matching logic extracted verbatim from notebooks/04_match.ipynb.
-Do not change algorithms here without also updating the notebook.
+Do not change scoring weights here without also updating the notebook.
 """
 
 import numpy as np
 import pandas as pd
 
+# Columns present in every valid schools_with_majors.csv.
+_REQUIRED_COLS = [
+    "name", "state", "school_type", "association",
+    "cost_international", "grad_rate", "pct_international",
+    "athlete_share", "athletic_aid_tier", "sport_culture_pct",
+    "sevp_certified", "offers_entrepreneurship", "has_athletics",
+    "undergrads", "open_admission", "mens_sports", "womens_sports",
+    "bachelor_cips", "associate_cips", "programs_known",
+    "has_transfer_track", "religious_affil",
+]
 
 # Columns shown in results tables (same list as notebook 04 cell 3).
 SHOW_COLS = [
@@ -19,6 +29,14 @@ SHOW_COLS = [
 def load_data(path="data/processed/schools_with_majors.csv") -> pd.DataFrame:
     """Load and prep the schools dataset (verbatim from notebook 04 cell 1)."""
     df = pd.read_csv(path)
+
+    missing = [c for c in _REQUIRED_COLS if c not in df.columns]
+    if missing:
+        raise ValueError(
+            f"schools_with_majors.csv is missing columns: {missing}. "
+            "Re-run the full pipeline (nb01 → nb03_athletics → nb05_sevp_link → nb06_majors)."
+        )
+
     df[["bachelor_cips", "associate_cips"]] = df[["bachelor_cips", "associate_cips"]].fillna("")
 
     # Collapse 12 city-size labels into 4 groups clients understand
@@ -56,17 +74,40 @@ def match(df: pd.DataFrame, client: dict, top_n: int = 25):
     c = c[c["school_type"].isin(client["school_types"])]
     funnel.append(("After school type", len(c)))
 
-    if client["states"]:
+    if client.get("states"):
         c = c[c["state"].isin(client["states"])]
         funnel.append(("After states", len(c)))
 
-    if client["city_groups"]:
+    if client.get("city_groups"):
         c = c[c["city_group"].isin(client["city_groups"])]
         funnel.append(("After city size", len(c)))
 
-    limit = client["max_budget"] * client.get("budget_flex", 1.0)
-    c = c[c["cost_international"] <= limit]            # unknown cost (NaN) is excluded too
-    funnel.append((f"After cost <= ${limit:,.0f}", len(c)))
+    # Religion filter (None / "catholic" / "any_religious" / "non_religious")
+    religion = client.get("religion")
+    if religion:
+        _none_affil = {-1, -2}
+        if religion == "catholic":
+            c = c[c["religious_affil"] == 30]
+            funnel.append(("After religious affiliation: Catholic", len(c)))
+        elif religion == "any_religious":
+            c = c[
+                c["religious_affil"].notna()
+                & ~c["religious_affil"].isin(_none_affil)
+            ]
+            funnel.append(("After religious affiliation: Any religious", len(c)))
+        elif religion == "non_religious":
+            c = c[
+                c["religious_affil"].isna()
+                | c["religious_affil"].isin(_none_affil)
+            ]
+            funnel.append(("After religious affiliation: Non-religious", len(c)))
+
+    # Cost filter: skipped when max_budget is None (no limit set in UI)
+    max_budget = client.get("max_budget")
+    if max_budget is not None:
+        limit = max_budget * client.get("budget_flex", 1.0)
+        c = c[c["cost_international"] <= limit]        # unknown cost (NaN) is excluded
+        funnel.append((f"After cost <= ${limit:,.0f}", len(c)))
 
     if client.get("sport"):
         col = "mens_sports" if client["gender"] == "men" else "womens_sports"
@@ -81,7 +122,7 @@ def match(df: pd.DataFrame, client: dict, top_n: int = 25):
         funnel.append(("After athletic scholarships available", len(c)))
 
     mg4, mg2 = client.get("min_grad_rate_4yr"), client.get("min_grad_rate_2yr")
-    if mg4 is not None or mg2 is not None:
+    if mg4 or mg2:
         # Each school gets the threshold for its type; missing grad rate is kept, not punished
         threshold = np.where(c["school_type"] == "4-year", mg4 or 0, mg2 or 0)
         c = c[c["grad_rate"].isna() | (c["grad_rate"] >= threshold)]
