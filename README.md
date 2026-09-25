@@ -17,6 +17,20 @@ This project matches Brazilian and other international student-athletes to US co
 | `04_match` | Client intake dictionary → hard filters → weighted score → ranked shortlist |
 | `05_sevp_link` | Links schools to the SEVP certified-institution list; flags F-1 eligibility; saves `schools_with_sevp.csv` |
 
+## Testing
+
+Run `.venv/bin/python -m pytest` before every push. The suite covers:
+
+- `test_matcher_top15` — direct `match()` call must reproduce the exact notebook-04 top-15 baseline (saved in `tests/expected_top15.json`)
+- `test_matcher_zero_weights_no_nan` — all weights = 0 must not produce NaN scores
+- `test_matcher_religion_catholic` — Catholic filter appears as a funnel step and reduces school count
+- `test_matcher_max_budget_none_includes_unknown_cost` — no-budget mode adds no cost step to the funnel
+- `test_defaults_load` — app loads with no exception; "Schools that fit" = 3147
+- `test_athlete_profile` — notebook-04 athlete profile via sidebar session state keys; no exception
+- `test_catholic_filter` — religion = Catholic via AppTest; count < 3147
+- `test_zero_weights_no_crash` — all sliders at "Don't care"; no `st.progress` crash
+- `test_clear_all` — restrictive filters then "Clear all filters" button returns count to 3147
+
 ## Known limitations
 
 - Costs are sticker prices before scholarships; no public data on what international students actually pay.

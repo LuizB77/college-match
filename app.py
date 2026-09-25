@@ -3,6 +3,7 @@ College Match — Streamlit demo.
 Sidebar inputs → src/matcher.py → metrics, cards, detail dialog, compare, map, full table.
 """
 
+import os
 from pathlib import Path
 import altair as alt
 import pydeck as pdk
@@ -202,7 +203,7 @@ DEFAULTS = {
 
 # ── Data ───────────────────────────────────────────────────────────────────────
 @st.cache_data
-def get_data():
+def get_data(mtime: float):  # mtime makes cache stale whenever the CSV is modified
     return load_data(DATA_PATH)
 
 
@@ -233,7 +234,7 @@ def get_intl_aid() -> pd.DataFrame:
     return aid
 
 
-df         = get_data()
+df         = get_data(os.path.getmtime(DATA_PATH))
 cip_lookup = get_cip_lookup()
 intl_aid   = get_intl_aid()
 
@@ -677,7 +678,8 @@ with tab_find:
                     else:
                         st.caption("per year · sticker price before scholarships")
 
-                    score = float(row["match_score"])
+                    score = float(row.get("match_score") or 50.0)
+                    score = max(0.0, min(100.0, score)) if score == score else 50.0  # clamp; guard NaN
                     st.progress(score / 100, text=f"Match score: {score:.1f} / 100")
 
                     badges = []

@@ -66,3 +66,4 @@ wcwidth==0.9.1
 webencodings==0.5.1
 streamlit==1.50.0
 zipp==3.23.1
+pytest==8.4.2

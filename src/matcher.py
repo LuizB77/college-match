@@ -165,7 +165,11 @@ def match(df: pd.DataFrame, client: dict, top_n: int = 25):
     # --- 3. Weighted score 0-100 + the 2 features that contributed most ---
     w = pd.Series(client["weights"], dtype=float)
     contrib = f[w.index] * w
-    c["match_score"] = (contrib.sum(axis=1) / w.sum() * 100).round(1)
+    total_w = w.sum()
+    if total_w > 0:
+        c["match_score"] = (contrib.sum(axis=1) / total_w * 100).round(1)
+    else:
+        c["match_score"] = 50.0          # all weights zero → equal score, no ranking
     c["top_reasons"] = contrib.apply(lambda r: ", ".join(r.nlargest(2).index), axis=1)
 
     results = c.sort_values("match_score", ascending=False).head(top_n)
