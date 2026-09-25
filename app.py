@@ -90,6 +90,94 @@ PRESETS = {
 
 AID_TIERS = {"Athletic scholarships", "Mixed / verify"}
 
+# IPEDS RELAFFIL code → human-readable label (from College Scorecard data dictionary).
+RELAFFIL_MAP: dict[int, str] = {
+    22: "American Evangelical Lutheran Church",
+    24: "African Methodist Episcopal Zion",
+    27: "Assemblies of God Church",
+    28: "Brethren Church",
+    30: "Roman Catholic",
+    33: "Wisconsin Evangelical Lutheran Synod",
+    34: "Christ and Missionary Alliance Church",
+    35: "Christian Reformed Church",
+    36: "Evangelical Congregational Church",
+    37: "Evangelical Covenant Church of America",
+    38: "Evangelical Free Church of America",
+    39: "Evangelical Lutheran Church",
+    40: "International United Pentecostal Church",
+    41: "Free Will Baptist Church",
+    42: "Interdenominational",
+    43: "Mennonite Brethren Church",
+    44: "Moravian Church",
+    45: "North American Baptist",
+    47: "Pentecostal Holiness Church",
+    48: "Christian Churches and Churches of Christ",
+    49: "Reformed Church in America",
+    50: "Episcopal Church, Reformed",
+    51: "African Methodist Episcopal",
+    52: "American Baptist",
+    53: "American Lutheran",
+    54: "Baptist",
+    55: "Christian Methodist Episcopal",
+    57: "Church of God",
+    58: "Church of Brethren",
+    59: "Church of the Nazarene",
+    60: "Cumberland Presbyterian",
+    61: "Christian Church (Disciples of Christ)",
+    64: "Free Methodist",
+    65: "Friends (Quaker)",
+    66: "Presbyterian Church (USA)",
+    67: "Lutheran Church in America",
+    68: "Lutheran Church — Missouri Synod",
+    69: "Mennonite Church",
+    71: "United Methodist",
+    73: "Protestant Episcopal",
+    74: "Churches of Christ",
+    75: "Southern Baptist",
+    76: "United Church of Christ",
+    77: "Protestant, not specified",
+    78: "Multiple Protestant Denominations",
+    79: "Other Protestant",
+    80: "Jewish",
+    81: "Reformed Presbyterian Church",
+    84: "United Brethren Church",
+    87: "Missionary Church",
+    88: "Undenominational",
+    89: "Wesleyan",
+    91: "Greek Orthodox",
+    92: "Russian Orthodox",
+    93: "Unitarian Universalist",
+    94: "Latter Day Saints (Mormon)",
+    95: "Seventh Day Adventists",
+    97: "Presbyterian Church in America",
+    99: "Other religious",
+    100: "Original Free Will Baptist",
+    101: "Ecumenical Christian",
+    102: "Evangelical Christian",
+    103: "Presbyterian",
+    105: "General Baptist",
+    106: "Muslim",
+    107: "Plymouth Brethren",
+    108: "Non-Denominational",
+    110: "Orthodox Christian",
+}
+
+# Codes indicating no religious affiliation
+_NONE_CODES = {-1, -2}
+
+# Set of codes considered "any religious affiliation" (all positive codes)
+_RELIGIOUS_CODES = set(RELAFFIL_MAP.keys())
+# Catholic-specific
+_CATHOLIC_CODES = {30}
+
+
+def affil_label(raw) -> str:
+    """Return human-readable affiliation label for a raw RELAFFIL value."""
+    if pd.isna(raw) or int(raw) in _NONE_CODES:
+        return "None"
+    code = int(raw)
+    return RELAFFIL_MAP.get(code, f"Code {code}")
+
 
 # ── Data ───────────────────────────────────────────────────────────────────────
 @st.cache_data
@@ -161,9 +249,11 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
     city_size = row.get("city_size") or "—"
     enrollment = row.get("undergrads")
     enrollment_str = f"{int(enrollment):,}" if pd.notna(enrollment) else "—"
+    row_affil_label = affil_label(row.get("religious_affil"))
+    affil_str = f"  ·  {row_affil_label}" if row_affil_label != "None" else ""
     st.caption(
         f"📍 {row['city']}, {row['state']}  ·  {row['school_type']}  ·  "
-        f"{row['association']}  ·  {city_size}\n"
+        f"{row['association']}  ·  {city_size}{affil_str}\n"
         f"👥 {enrollment_str} undergraduates"
     )
 
@@ -275,6 +365,14 @@ with st.sidebar:
 
     major_label = st.selectbox("Intended major", list(MAJOR_OPTIONS.keys()), index=1)
 
+    affil_filter = st.selectbox(
+        "Religious affiliation",
+        ["Any", "Catholic", "Any religious", "Non-religious"],
+        help="'Any' shows all schools. 'Catholic' shows only Roman Catholic schools. "
+             "'Any religious' shows schools with any stated affiliation. "
+             "'Non-religious' shows schools with no stated affiliation.",
+    )
+
     with st.expander("Advanced"):
         budget_flex = st.slider(
             "Stretch budget for athletes (scholarships expected)", 1.0, 2.0, 1.5, step=0.1,
@@ -349,8 +447,23 @@ client = {
     "weights":                   weights,
 }
 
+# ── Pre-filter: religious affiliation (hard filter applied before match()) ─────
+df_filtered = df.copy()
+if affil_filter == "Catholic":
+    df_filtered = df_filtered[df_filtered["religious_affil"].isin(_CATHOLIC_CODES)]
+elif affil_filter == "Any religious":
+    df_filtered = df_filtered[
+        df_filtered["religious_affil"].notna()
+        & ~df_filtered["religious_affil"].isin(_NONE_CODES)
+    ]
+elif affil_filter == "Non-religious":
+    df_filtered = df_filtered[
+        df_filtered["religious_affil"].isna()
+        | df_filtered["religious_affil"].isin(_NONE_CODES)
+    ]
+
 # ── Run matcher ────────────────────────────────────────────────────────────────
-results, funnel = match(df, client, top_n=25)
+results, funnel = match(df_filtered, client, top_n=25)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_find, tab_how = st.tabs(["Find schools", "How it works"])
@@ -415,6 +528,9 @@ with tab_find:
                         badges.append(("Entrepreneurship", "orange"))
                     if row.get("school_type") == "2-year" and row.get("has_transfer_track"):
                         badges.append(("Transfer track", "violet"))
+                    row_affil = affil_label(row.get("religious_affil"))
+                    if row_affil != "None":
+                        badges.append((row_affil, "gray"))
                     st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
 
                     w1, w2 = split_reasons(row["top_reasons"])
@@ -446,6 +562,7 @@ with tab_find:
                     "Athlete share":    f"{a_shr:.0%}"  if pd.notna(a_shr) else "—",
                     "Association":      r.get("association") or "—",
                     "Aid tier":         r.get("athletic_aid_tier") or "—",
+                    "Affiliation":      affil_label(r.get("religious_affil")),
                     "Entrepreneurship": "Yes" if r["offers_entrepreneurship"] else "No",
                     "Score":            f"{r['match_score']:.1f}",
                     "Why #1":           c_w1,
