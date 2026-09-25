@@ -297,10 +297,7 @@ for i, row in top6.iterrows():
             if row.get("school_type") == "2-year" and row.get("has_transfer_track"):
                 badges.append(("Transfer track", "violet"))
 
-            bcols = st.columns(len(badges))
-            for bc, (label, color) in zip(bcols, badges):
-                with bc:
-                    st.badge(label, color=color)
+            st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
 
             w1, w2 = split_reasons(row["top_reasons"])
             why = " · ".join(filter(None, [w1, w2]))
