@@ -110,11 +110,14 @@ with st.sidebar:
     # Academics
     st.subheader("Academics")
     major_label = st.selectbox("Major area", list(MAJOR_OPTIONS.keys()), index=1)
-    min_grad_4yr = st.slider("Min grad rate — 4-year", 0.0, 1.0, 0.30, step=0.05,
-                             format="%.0f%%",
+    strict_major = st.checkbox("Require exact major (don't count general transfer tracks)",
+                               value=False,
+                               help="When checked, 2-year schools must offer the major as an associate degree; a general Liberal Arts transfer track no longer qualifies.")
+    min_grad_4yr = st.slider("Min grad rate — 4-year", 0, 100, 30, step=5,
+                             format="%d%%",
                              help="4-year schools below this are excluded. Schools with unknown rates are kept.")
-    min_grad_2yr = st.slider("Min grad rate — 2-year", 0.0, 1.0, 0.20, step=0.05,
-                             format="%.0f%%")
+    min_grad_2yr = st.slider("Min grad rate — 2-year", 0, 100, 20, step=5,
+                             format="%d%%")
 
     # Visa
     st.subheader("Visa")
@@ -138,9 +141,10 @@ client = {
     "sport": sport_choice if sport_choice != "None" else None,
     "gender": gender,
     "needs_athletic_scholarship": needs_scholarship,
-    "min_grad_rate_4yr": min_grad_4yr,
-    "min_grad_rate_2yr": min_grad_2yr,
+    "min_grad_rate_4yr": min_grad_4yr / 100,
+    "min_grad_rate_2yr": min_grad_2yr / 100,
     "majors": MAJOR_OPTIONS[major_label],
+    "strict_major": strict_major,
     "weights": weights,
 }
 
@@ -180,9 +184,9 @@ else:
     display["athlete_share"] = display["athlete_share"].apply(
         lambda x: f"{x:.0%}" if pd.notna(x) else "—"
     )
-    # Map internal feature keys in "top_reasons" to readable labels.
+    # Map internal feature keys in "top_reasons" to readable labels; one per line for full visibility.
     def readable_reasons(s):
-        return ", ".join(FEATURE_LABELS.get(r.strip(), r.strip()) for r in str(s).split(","))
+        return "\n".join(FEATURE_LABELS.get(r.strip(), r.strip()) for r in str(s).split(","))
 
     display["top_reasons"] = display["top_reasons"].apply(readable_reasons)
 
@@ -201,7 +205,7 @@ else:
     })
 
     col_config = {
-        "Top reasons": st.column_config.TextColumn("Top reasons", width="large"),
+        "Top reasons": st.column_config.TextColumn("Top reasons", width="medium"),
     }
     st.dataframe(display, use_container_width=True, hide_index=True, column_config=col_config)
 

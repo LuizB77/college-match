@@ -93,13 +93,15 @@ def match(df: pd.DataFrame, client: dict, top_n: int = 25):
         def has_major(cips):
             return any(c.startswith(p) for c in str(cips).split(";") if c for p in prefixes)
 
+        strict = client.get("strict_major", False)
+
         def major_ok(r):
             if not r["programs_known"]:
                 return True    # no program data: unknown, not failing -> keep
             if r["school_type"] == "4-year":
                 return has_major(r["bachelor_cips"])
-            # JUCO: the major itself, or a general transfer track (Liberal Arts, CIP 24.01)
-            return has_major(r["associate_cips"]) or r["has_transfer_track"]
+            # JUCO: the major itself, or (when not strict) a general transfer track (CIP 24.01)
+            return has_major(r["associate_cips"]) or (not strict and r["has_transfer_track"])
 
         c = c[c.apply(major_ok, axis=1)]
         funnel.append((f"After offers major {prefixes}", len(c)))
