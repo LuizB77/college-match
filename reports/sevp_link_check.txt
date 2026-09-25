@@ -1,37 +1,37 @@
 Match method:
 sevp_match
 exact              2277
-None                563
+None                549
 parent              167
-subset              106
-fuzzy                20
+subset              122
+fuzzy                18
 online_excluded      11
 NaN                   3
 
 Certified by school type:
 sevp_certified  False  True   All
 school_type                      
-2-year            416   934  1350
-4-year            161  1636  1797
-All               577  2570  3147
+2-year            408   942  1350
+4-year            155  1642  1797
+All               563  2584  3147
 
 15 random SUBSET matches (review):
-                                              name state                                              sevp_school                              sevp_campus  sevp_score
-                    Kent State University at Salem    OH                                    Kent State University                                    Salem       100.0
-     Missouri University of Science and Technology    MO                                   University of Missouri Missouri University of Science and Techn       100.0
-                               Villa Maria College    NY                           VILLA MARIA COLLEGE OF BUFFALO           VILLA MARIA COLLEGE OF BUFFALO       100.0
-        Citadel Military College of South Carolina    SC                                              The Citadel                              The Citadel       100.0
-                  Southeast Community College Area    NE                              Southeast Community College                         Education Square       100.0
-                                  SUNY at Fredonia    NY                             State University of New York                                 Fredonia       100.0
-SUNY College of Environmental Science and Forestry    NY SUNY College of Environmental Science and Forestry (SYR) College of Environmental Science and For       100.0
-                           Pierce College District    WA                                           Pierce College                          Fort Steilacoom       100.0
-            Schoolcraft Community College District    MI                                      Schoolcraft College                                  Livonia       100.0
-                        Upstate Medical University    NY  State University of New York Upstate Medical University State University of New York Upstate Med       100.0
-                                Elim Bible College    NY                         Elim Bible Institute and College         Elim Bible Institute and College       100.0
-                   Cayuga County Community College    NY                                 Cayuga Community College                 Cayuga Community College       100.0
-   Mercy-St Luke's School of Radiologic Technology    IA                                   Mount Mercy University       CRST International Graduate Center       100.0
-Mesivta of Eastern Parkway-Yeshiva Zichron Meilech    NY           Mesivta of Eastern Parkway Rabbinical Seminary Mesivta of Eastern Parkway Rabbinical Se       100.0
-                     Concordia College at Moorhead    MN                                        Concordia College                        Concordia College       100.0
+                                                                   name state                                 sevp_school                              sevp_campus  sevp_score
+                                              Rutgers University-Camden    NJ Rutgers, the State University of New Jersey                           Rutgers-Camden       100.0
+                                       Colorado State University Global    CO                   Colorado State University                                 SPUR CSU       100.0
+                                    Kent State University at Tuscarawas    OH                       Kent State University                               Tuscarawas       100.0
+                                             Albizu University-San Juan    PR                    CARLOS ALBIZU UNIVERSITY                 CARLOS ALBIZU UNIVERSITY       100.0
+                                       Southeast Community College Area    NE                 Southeast Community College                         Education Square       100.0
+                                                     The Landing School    ME   Landing School of Boatbuilding and Design Landing School of Boatbuilding and Desig       100.0
+                                                    Villa Maria College    NY              VILLA MARIA COLLEGE OF BUFFALO           VILLA MARIA COLLEGE OF BUFFALO       100.0
+                              University of New Hampshire at Manchester    NH                 University of New Hampshire University of New Hampshire - Manchester       100.0
+                        University of North Texas Health Science Center    TX                   University of North Texas                UNT Health Science Center       100.0
+                                                  Saint Vincent College    PA          Saint Vincent College and Seminary       Saint Vincent College and Seminary       100.0
+            Warner Pacific University Professional and Graduate Studies    OR                   Warner Pacific University                Warner Pacific University       100.0
+                                  The New England Conservatory of Music    MA                    New England Conservatory                 New England Conservatory       100.0
+                                                         William & Mary    VA             The College of William and Mary          The College of William and Mary       100.0
+                                                    Yeshiva Ohr Yisrael    NY                 Yeshiva Gedolah Ohr Yisroel Yeshiva Gedola Ohr Yisrael of Marine Par       100.0
+West Virginia University Hospital Departments of Rad Tech and Nutrition    WV                    West Virginia University     West Virginia University, Morgantown       100.0
 
 Online units excluded:
                                                               name state
@@ -68,13 +68,12 @@ Pennsylvania State University-Penn State Erie-Behrend College    PA             
                           Remington College-Shreveport Campus    LA       Shreveport       None                    Northwestern State University                       Shreveport Campus        65.4
                             The Chicago School at Los Angeles    CA      Los Angeles     subset    The Chicago School of Professional Psychology          The Chicago School-Los Angeles       100.0
 
-Likely linkage misses (2%+ international, not matched): 47
+Likely linkage misses (2%+ international, not matched): 43
                                                           name state  pct_international                                                         sevp_school  sevp_score
                              Lindsey Hopkins Technical College    FL              0.244                                          Southern Technical College        67.8
                            Yeshiva Gedolah of Woodlake Village    NJ              0.218 Yeshiva Gedola of Woodlake Village DBA Yeshiva Ohr ZechariYaehshiva        66.7
                                       American Islamic College    IL              0.188                                              Christian Life College        65.2
                                  Union Commonwealth University    KY              0.184                                        American National University        66.7
-                                             Shoreline College    WA              0.145                                                    Highline College        78.8
                       School of Missionary Aviation Technology    MI              0.139                             Catholic Diocese of Kalamazoo, Michigan        58.5
          Massachusetts College of Pharmacy and Health Sciences    MA              0.118                               Massachusetts College of Liberal Arts        66.7
                                    Beth Medrash of Asbury Park    NJ              0.113                                     Bais Medrash Toras Chesed, Inc.        57.7
@@ -95,34 +94,12 @@ Likely linkage misses (2%+ international, not matched): 47
 Eastern New Mexico University Ruidoso Branch Community College    NM              0.045                                       Eastern New Mexico University        66.7
                          Orange Technical College-South Campus    FL              0.042                                          Southern Technical College        73.0
                                          Binghamton University    NY              0.040                                                 Houghton University        80.0
+                                              Sterling College    VT              0.040                                                    Landmark College        62.5
 
-Previous run -> this run: gained 7, lost 25
+Previous run -> this run: gained 14, lost 0
 Lost:
-                                                                                  name state sevp_match
-                                                             Barstow Community College    CA       None
-                               Los Angeles County College of Nursing and Allied Health    CA       None
-                                                                        Merced College    CA       None
-                                                         The Chicago School at Chicago    IL       None
-Baton Rouge General Medical Center School of Nursing & School of Radiologic Technology    LA       None
-                                                  SUNY College of Technology at Canton    NY       None
-                              SUNY College of Agriculture and Technology at Cobleskill    NY       None
-                                                             Farmingdale State College    NY       None
-                                                                  University at Albany    NY       None
-                                              State University of New York at Cortland    NY       None
-                                                   Kutztown University of Pennsylvania    PA       None
-                                              Slippery Rock University of Pennsylvania    PA       None
-                                               West Chester University of Pennsylvania    PA       None
-                                                     Austin Community College District    TX       None
-                                                       Remington College-Dallas Campus    TX       None
-                                                             El Paso Community College    TX       None
-                                                                  Houston City College    TX       None
-                                                      Virginia University of Lynchburg    VA       None
-                                                                     Shoreline College    WA       None
-                                                          Caribbean University-Bayamon    PR       None
-                                                              Athens Technical College    GA       None
-                                                        Moore Norman Technology Center    OK       None
-                                                    Remington College-Nashville Campus    TN       None
-                                                                       Lemoore College    CA       None
-                                                   Remington College-Shreveport Campus    LA       None
+Empty DataFrame
+Columns: [name, state, sevp_match]
+Index: []
 
 Saved: (3147, 52)
