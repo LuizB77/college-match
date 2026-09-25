@@ -24,6 +24,7 @@ PRIMARY_RGB   = [11, 110, 79]
 
 DATA_PATH     = Path(__file__).parent / "data" / "processed" / "schools_with_majors.csv"
 CIP_PATH      = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
+AID_PATH      = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
 
 MAJOR_OPTIONS = {
     "None":               None,
@@ -192,8 +193,44 @@ def get_cip_lookup() -> dict:
     return dict(zip(df["cip4"], df["name"]))
 
 
+@st.cache_data
+def get_intl_aid() -> pd.DataFrame:
+    """Load manually curated international aid data. Returns empty df if file is missing."""
+    if not AID_PATH.exists():
+        return pd.DataFrame(columns=["unitid", "offers_intl_aid", "meets_full_need_intl",
+                                      "need_blind_intl", "pct_intl_aided", "avg_intl_award",
+                                      "cds_year", "source_url"])
+    aid = pd.read_csv(AID_PATH, comment="#")
+    # Drop rows without a numeric unitid (placeholder / comment rows)
+    aid = aid[pd.to_numeric(aid["unitid"], errors="coerce").notna()].copy()
+    aid["unitid"] = aid["unitid"].astype(int)
+    aid["avg_intl_award"] = pd.to_numeric(aid["avg_intl_award"], errors="coerce")
+    for bool_col in ["offers_intl_aid", "meets_full_need_intl", "need_blind_intl"]:
+        if bool_col in aid.columns:
+            aid[bool_col] = aid[bool_col].map(
+                lambda v: True if str(v).strip().upper() == "TRUE" else
+                          (False if str(v).strip().upper() == "FALSE" else None)
+            )
+    return aid
+
+
 df         = get_data()
 cip_lookup = get_cip_lookup()
+intl_aid   = get_intl_aid()
+
+# Left-join aid data onto main df (unit_id in df, unitid in aid file)
+if not intl_aid.empty:
+    df = df.merge(intl_aid, left_on="unit_id", right_on="unitid", how="left")
+    df["est_net_cost"] = df["cost_international"] - df["avg_intl_award"]
+else:
+    df["est_net_cost"]       = float("nan")
+    df["offers_intl_aid"]    = None
+    df["meets_full_need_intl"] = None
+    df["need_blind_intl"]    = None
+    df["pct_intl_aided"]     = float("nan")
+    df["avg_intl_award"]     = float("nan")
+    df["cds_year"]           = None
+    df["source_url"]         = None
 
 ALL_SPORTS = sorted({
     s.strip()
@@ -261,10 +298,40 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
     st.markdown("### Cost")
     cost_intl = row.get("cost_international")
     cost_oos  = row.get("tuition_out_of_state")
+    est_net   = row.get("est_net_cost")
     col1, col2 = st.columns(2)
     col1.metric("International estimate / yr", f"${cost_intl:,.0f}" if pd.notna(cost_intl) else "—")
     col2.metric("Out-of-state tuition",        f"${cost_oos:,.0f}"  if pd.notna(cost_oos)  else "—")
     st.caption("Sticker prices before scholarships or financial aid.")
+
+    # International Aid
+    if row.get("offers_intl_aid") is not None:
+        st.markdown("### International Financial Aid")
+        avg_award = row.get("avg_intl_award")
+        pct_aided = row.get("pct_intl_aided")
+        cds_yr    = row.get("cds_year")
+        src_url   = row.get("source_url")
+        a1, a2, a3 = st.columns(3)
+        a1.metric("Offers need-based intl aid", "Yes" if row.get("offers_intl_aid") else "No")
+        a2.metric("Avg award / yr",  f"${avg_award:,.0f}" if pd.notna(avg_award) else "Not reported")
+        a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
+        flags_aid = []
+        if row.get("meets_full_need_intl"):
+            flags_aid.append("Meets 100% of demonstrated need")
+        if row.get("need_blind_intl"):
+            flags_aid.append("Need-blind admission")
+        if pct_aided and pd.notna(pct_aided):
+            flags_aid.append(f"{pct_aided:.0%} of aided international undergrads receive aid")
+        if flags_aid:
+            st.markdown("  ·  ".join(flags_aid))
+        caption_parts = []
+        if cds_yr and str(cds_yr) not in ("None", "nan"):
+            caption_parts.append(f"CDS year: {cds_yr}")
+        st.caption(
+            "Source: Common Data Set (Section H6). " + ("  ·  ".join(caption_parts) if caption_parts else "")
+        )
+        if src_url and str(src_url) not in ("None", "nan", "TODO"):
+            st.link_button("View Common Data Set ↗", url=str(src_url))
 
     # Athletics
     if row.get("has_athletics"):
@@ -462,8 +529,26 @@ elif affil_filter == "Non-religious":
         | df_filtered["religious_affil"].isin(_NONE_CODES)
     ]
 
+# ── Swap cost_international → est_net_cost where intl aid data is available ───
+# This lets matcher.py's budget filter use the estimated net cost without
+# changing the matcher itself. The original sticker cost stays in df for display.
+has_aid_estimate = df_filtered["est_net_cost"].notna()
+if has_aid_estimate.any():
+    df_for_match = df_filtered.copy()
+    df_for_match.loc[has_aid_estimate, "cost_international"] = df_for_match.loc[
+        has_aid_estimate, "est_net_cost"
+    ]
+else:
+    df_for_match = df_filtered
+
 # ── Run matcher ────────────────────────────────────────────────────────────────
-results, funnel = match(df_filtered, client, top_n=25)
+results, funnel = match(df_for_match, client, top_n=25)
+
+# Restore original cost_international in results (for display), but keep est_net_cost
+if has_aid_estimate.any():
+    orig_cost = df_filtered["cost_international"]
+    results["cost_international"] = results.index.map(orig_cost)
+    results["est_net_cost"] = results.index.map(df_filtered["est_net_cost"])
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_find, tab_how = st.tabs(["Find schools", "How it works"])
@@ -515,14 +600,20 @@ with tab_find:
                     st.caption(f"{row['city']}, {row['state']}  ·  {row['school_type']}  ·  {row['association']}")
 
                     cost = row["cost_international"]
-                    st.markdown(f"### {'$' + f'{cost:,.0f}' if pd.notna(cost) else '—'}")
-                    st.caption("per year · sticker price before scholarships")
+                    est  = row.get("est_net_cost")
+                    has_est = pd.notna(est)
+                    display_cost = est if has_est else cost
+                    st.markdown(f"### {'$' + f'{display_cost:,.0f}' if pd.notna(display_cost) else '—'}")
+                    cost_caption = "per year · est. after intl aid" if has_est else "per year · sticker price before scholarships"
+                    st.caption(cost_caption)
 
                     score = float(row["match_score"])
                     st.progress(score / 100, text=f"Match score: {score:.1f} / 100")
 
                     badges = [("F-1 certified", "green")]
-                    if row.get("athletic_aid_tier") in AID_TIERS:
+                    if row.get("offers_intl_aid") is True:
+                        badges.append(("Intl aid", "blue"))
+                    elif row.get("athletic_aid_tier") in AID_TIERS:
                         badges.append(("Athletic aid", "blue"))
                     if row.get("offers_entrepreneurship"):
                         badges.append(("Entrepreneurship", "orange"))
@@ -707,6 +798,15 @@ mostly because of a preference you don't actually care about, lower that weight 
         )
         st.link_button("ope.ed.gov/athletics ↗", "https://ope.ed.gov/athletics")
 
+        st.markdown("**Common Data Set — Section H6**")
+        st.markdown(
+            "Per-school international student financial aid: whether the school offers "
+            "need-based aid to internationals, average award amounts, and admission policy. "
+            "Collected manually from each school's published CDS. "
+            "Coverage is limited — only schools in our database with a filed CDS are included."
+        )
+        st.link_button("commondataset.org ↗", "https://www.commondataset.org")
+
     # ── Limitations ───────────────────────────────────────────────────────────
     st.header("What this tool can't tell you")
     st.markdown(
@@ -729,6 +829,12 @@ mostly because of a preference you don't actually care about, lower that weight 
 - **Scores are relative to your search, not absolute grades.** A score of 85 means this school
   ranked very well among the options that passed your filters. The same school might score 60
   in a different search with different filters or preferences.
+
+- **International aid figures are manually collected and may be outdated.** Aid data comes from
+  each school's Common Data Set (Section H6), entered by hand. Only a small number of schools
+  have been filed so far. Figures are per-school averages across all international aided students
+  — your actual award depends on your family's financial situation and the school's specific policy.
+  Always confirm with the school's financial aid office before making decisions.
 
 - **F-1 eligibility data has a lag.** The SEVP list was last downloaded in September 2026.
   A small number of schools may have been certified or decertified since then. Always confirm
