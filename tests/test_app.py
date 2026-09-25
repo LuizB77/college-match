@@ -15,7 +15,7 @@ import pytest
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.matcher import load_data, match
+from src.matcher import load_data, match, explain_exclusion
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -93,10 +93,46 @@ def test_matcher_zero_weights_no_nan(df):
             "entrepreneurship_program",
         ]},
     }
-    results, funnel = match(df, client, top_n=25)
+    results, funnel = match(df, client)
     assert not results.empty
     assert results["match_score"].notna().all(), "match_score must never be NaN"
     assert funnel[-1][1] == len(df), "with no filters all schools should pass"
+
+
+def test_match_returns_all_passing(df, notebook04_client):
+    """match() with no top_n must return ALL schools that pass the filters."""
+    results_all, funnel = match(df, notebook04_client)
+    expected_count = funnel[-1][1]
+    assert len(results_all) == expected_count, (
+        f"Expected {expected_count} results (all passing schools), got {len(results_all)}"
+    )
+    # Must be at least 15 (we know 15 in the baseline)
+    assert len(results_all) >= 15
+
+
+def test_f1_metric_equals_sevp_count(df):
+    """With default (no F-1 filter), F-1 certified count from results == total sevp_certified in data."""
+    client = {
+        "name": "f1-test",
+        "require_f1": False,
+        "max_budget": None,
+        "budget_flex": 1.5,
+        "school_types": ["2-year", "4-year"],
+        "states": None, "city_groups": None, "sport": None,
+        "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": None, "strict_major": False, "religion": None,
+        "weights": {"low_cost": 1, "grad_rate": 0, "sport_culture": 0,
+                    "athlete_opportunity": 0, "international_community": 0,
+                    "open_admission": 0, "small_school": 0,
+                    "entrepreneurship_program": 0},
+    }
+    results, _ = match(df, client)
+    f1_in_results = int(results["sevp_certified"].sum())
+    f1_in_data = int(df["sevp_certified"].sum())
+    assert f1_in_results == f1_in_data, (
+        f"F-1 count in results ({f1_in_results}) must equal total in data ({f1_in_data})"
+    )
 
 
 def test_matcher_religion_catholic(df, notebook04_client):
@@ -104,7 +140,7 @@ def test_matcher_religion_catholic(df, notebook04_client):
     client = {**notebook04_client, "religion": "catholic",
               "max_budget": None, "require_f1": False, "sport": None,
               "needs_athletic_scholarship": False}
-    results, funnel = match(df, client, top_n=25)
+    results, funnel = match(df, client)
     steps = [step for step, _ in funnel]
     assert any("Catholic" in s for s in steps), f"Expected Catholic step in funnel: {steps}"
     # Catholic schools are a subset: fewer than all schools
@@ -133,9 +169,84 @@ def test_matcher_max_budget_none_includes_unknown_cost(df):
                     "open_admission": 0, "small_school": 0,
                     "entrepreneurship_program": 0},
     }
-    results, funnel = match(df, client, top_n=25)
+    results, funnel = match(df, client)
     cost_steps = [s for s, _ in funnel if "cost" in s.lower()]
     assert not cost_steps, f"No cost filter step expected, got: {cost_steps}"
+
+
+# ---------------------------------------------------------------------------
+# explain_exclusion tests
+# ---------------------------------------------------------------------------
+
+_STRICT_CLIENT = {
+    "name": "strict",
+    "require_f1": True,
+    "max_budget": 25_000,
+    "budget_flex": 1.5,
+    "school_types": ["2-year", "4-year"],
+    "states": None, "city_groups": None,
+    "sport": "Soccer", "gender": "men",
+    "needs_athletic_scholarship": True,
+    "min_grad_rate_4yr": 0.30, "min_grad_rate_2yr": 0.20,
+    "majors": ["52"],
+    "strict_major": False, "religion": None,
+    "weights": {"low_cost": 5, "grad_rate": 3, "sport_culture": 2,
+                "athlete_opportunity": 4, "international_community": 3,
+                "open_admission": 0, "small_school": 1, "entrepreneurship_program": 2},
+}
+
+
+def test_explain_exclusion_not_f1(df):
+    """A non-SEVP-certified school must report the F-1 reason."""
+    row = df[~df["sevp_certified"]].iloc[0]
+    reasons = explain_exclusion(row, _STRICT_CLIENT)
+    assert any("F-1" in r for r in reasons), f"Expected F-1 reason, got: {reasons}"
+
+
+def test_explain_exclusion_over_budget(df):
+    """A school over budget must report the cost reason."""
+    aid_tiers = {"Athletic scholarships", "Mixed / verify"}
+    over = df[
+        (df["cost_international"] > 25_000 * 1.5)
+        & df["sevp_certified"]
+        & df["mens_sports"].fillna("").str.contains("Soccer")
+        & df["athletic_aid_tier"].isin(aid_tiers)
+    ]
+    if over.empty:
+        pytest.skip("No over-budget soccer school with athletic aid in dataset")
+    row = over.iloc[0]
+    reasons = explain_exclusion(row, _STRICT_CLIENT)
+    assert any("budget" in r.lower() or "cost" in r.lower() for r in reasons), (
+        f"Expected cost reason for {row['name']}, got: {reasons}"
+    )
+
+
+def test_explain_exclusion_passing_is_empty(df):
+    """A passing school must return an empty exclusion list."""
+    results, _ = match(df, _STRICT_CLIENT)
+    row = results.iloc[0]
+    reasons = explain_exclusion(row, _STRICT_CLIENT)
+    assert reasons == [], f"Expected no reasons for passing school {row['name']}, got: {reasons}"
+
+
+def test_explain_exclusion_consistent_with_match(df):
+    """For 200 randomly sampled schools, explain_exclusion returns [] iff school is in match()."""
+    import random
+    results, _ = match(df, _STRICT_CLIENT)
+    passing_ids = set(results.index)
+    random.seed(42)
+    sample_idxs = random.sample(list(df.index), 200)
+    mismatches = []
+    for idx in sample_idxs:
+        row = df.loc[idx]
+        reasons = explain_exclusion(row, _STRICT_CLIENT)
+        in_results = idx in passing_ids
+        if (len(reasons) == 0) != in_results:
+            mismatches.append((row["name"], reasons, in_results))
+    assert not mismatches, (
+        f"{len(mismatches)} explain_exclusion / match() disagreements:\n"
+        + "\n".join(f"  {n}: reasons={r} in_results={i}" for n, r, i in mismatches[:5])
+    )
 
 
 # ---------------------------------------------------------------------------

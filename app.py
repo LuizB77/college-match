@@ -10,7 +10,7 @@ import pydeck as pdk
 import streamlit as st
 import pandas as pd
 
-from src.matcher import load_data, match, SHOW_COLS
+from src.matcher import load_data, match, explain_exclusion, SHOW_COLS
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -310,7 +310,7 @@ def _program_list(cips_str: str, major_prefixes):
 @st.dialog("School details")
 def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
     name = row["name"]
-    st.markdown(f"## {name}")
+    st.header(name, anchor=False)
 
     city_size = row.get("city_size") or "—"
     enrollment = row.get("undergrads")
@@ -325,7 +325,7 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
     )
 
     # Cost
-    st.markdown("### Cost")
+    st.subheader("Cost", anchor=False)
     cost_intl = row.get("cost_international")
     cost_oos  = row.get("tuition_out_of_state")
     est_net   = row.get("est_net_cost")
@@ -336,7 +336,7 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
 
     # International Aid
     if row.get("offers_intl_aid") is not None:
-        st.markdown("### International Financial Aid")
+        st.subheader("International Financial Aid", anchor=False)
         avg_award = row.get("avg_intl_award")
         pct_aided = row.get("pct_intl_aided")
         cds_yr    = row.get("cds_year")
@@ -368,7 +368,7 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
 
     # Athletics
     if row.get("has_athletics"):
-        st.markdown("### Athletics")
+        st.subheader("Athletics", anchor=False)
         aid_tier = row.get("athletic_aid_tier") or "—"
         division = row.get("association") or "—"
         aid_col = "aid_per_athlete_men" if selected_gender == "men" else "aid_per_athlete_women"
@@ -390,7 +390,7 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
         st.caption("No athletics reported for this school.")
 
     # Academics
-    st.markdown("### Academics")
+    st.subheader("Academics", anchor=False)
     grad = row.get("grad_rate")
     grad_str = f"{grad:.0%}" if pd.notna(grad) else "—"
     if row["school_type"] == "2-year" and pd.notna(grad):
@@ -417,7 +417,7 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
     bach_progs  = _program_list(row.get("bachelor_cips",  ""), major_prefixes)
 
     if assoc_progs or bach_progs:
-        st.markdown("### Programs offered")
+        st.subheader("Programs offered", anchor=False)
         if assoc_progs:
             st.markdown("**Associate's degrees**")
             for is_match, pname in assoc_progs[:20]:
@@ -593,7 +593,7 @@ else:
     df_for_match = df
 
 # ── Run matcher ────────────────────────────────────────────────────────────────
-results, funnel = match(df_for_match, client, top_n=25)
+results, funnel = match(df_for_match, client)
 
 # Restore original sticker cost for display; keep est_net_cost alongside.
 if has_aid_estimate.any() and not results.empty:
@@ -609,7 +609,7 @@ tab_find, tab_how = st.tabs(["Find schools", "How it works"])
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_find:
 
-    st.title("College Match")
+    st.title("College Match", anchor=False)
     st.markdown(
         "Find U.S. colleges and junior colleges that fit an international student's "
         "budget, sport, major, and visa needs."
@@ -643,112 +643,193 @@ with tab_find:
         else:
             st.metric("F-1 certified", "—")
 
+    # ── School lookup ──────────────────────────────────────────────────────────
+    school_labels = df["name"] + " (" + df["state"].fillna("?") + ")"
+    school_label_to_idx = dict(zip(school_labels, df.index))
+    lookup_label = st.selectbox(
+        "Look up any school...",
+        options=[""] + school_labels.tolist(),
+        index=0,
+        label_visibility="collapsed",
+        placeholder="Look up any school...",
+        key="school_lookup",
+    )
+    if lookup_label and lookup_label in school_label_to_idx:
+        row_idx = school_label_to_idx[lookup_label]
+        lookup_row = df_for_match.loc[row_idx]
+        lookup_row_display = df.loc[row_idx]
+        reasons = explain_exclusion(lookup_row, client)
+
+        with st.container(border=True):
+            if not reasons:
+                # School passes — find its rank
+                if not results.empty and row_idx in results.index:
+                    rank_pos = results.index.tolist().index(row_idx) + 1
+                    total_m = len(results)
+                    score = results.loc[row_idx, "match_score"]
+                    st.markdown(
+                        f"**Ranks #{rank_pos} of {total_m} for this profile** · "
+                        f"Match score: {score:.1f} / 100"
+                    )
+                else:
+                    st.markdown("**Passes all filters** for this profile.")
+                if st.button("Details", key="lookup_det"):
+                    show_detail(lookup_row_display, gender, client.get("majors"))
+            else:
+                st.markdown(f"**Not on your list because:**")
+                for r in reasons:
+                    st.markdown(f"- {r}")
+                if st.button("Details", key="lookup_det"):
+                    show_detail(lookup_row_display, gender, client.get("majors"))
+
     # Empty state
     if results.empty:
         st.info("No schools pass the current filters. Try relaxing budget, grad rate, or sport filters.")
     else:
-        # Result cards — top 6
-        st.subheader("Top matches")
-        top6      = results.head(6).reset_index(drop=True)
-        card_cols = st.columns(3)
-
-        for i, row in top6.iterrows():
-            with card_cols[i % 3]:
-                with st.container(border=True):
-                    rank = i + 1
-                    st.markdown(f"**#{rank} · {row['name']}**")
-                    st.caption(
-                        f"{row['city']}, {row['state']}  ·  {row['school_type']}  ·  "
-                        f"{row['association'] or '—'}"
-                    )
-
-                    cost = row["cost_international"]
-                    est  = row.get("est_net_cost")
-                    has_est = pd.notna(est)
-                    display_cost = est if has_est else cost
-                    st.markdown(f"### {'$' + f'{display_cost:,.0f}' if pd.notna(display_cost) else '—'}")
-                    if has_est:
-                        pct_aided = row.get("pct_intl_aided")
-                        aided_note = (
-                            f" · {pct_aided:.0%} of internationals receive aid"
-                            if pd.notna(pct_aided)
-                            else " · aid share unknown"
-                        )
-                        st.caption(f"per year · Estimated cost if aided{aided_note}")
-                    else:
-                        st.caption("per year · sticker price before scholarships")
-
-                    score = float(row.get("match_score") or 50.0)
-                    score = max(0.0, min(100.0, score)) if score == score else 50.0  # clamp; guard NaN
-                    st.progress(score / 100, text=f"Match score: {score:.1f} / 100")
-
-                    badges = []
-                    if row.get("sevp_certified"):
-                        badges.append(("F-1 certified", "green"))
-                    else:
-                        badges.append(("Not F-1 certified", "red"))
-                    if row.get("offers_intl_aid") is True:
-                        badges.append(("Intl aid", "blue"))
-                    elif row.get("athletic_aid_tier") in AID_TIERS:
-                        badges.append(("Athletic aid", "blue"))
-                    if row.get("offers_entrepreneurship"):
-                        badges.append(("Entrepreneurship", "orange"))
-                    if row.get("school_type") == "2-year" and row.get("has_transfer_track"):
-                        badges.append(("Transfer track", "violet"))
-                    row_affil = affil_label(row.get("religious_affil"))
-                    if row_affil:
-                        badges.append((row_affil, "gray"))
-                    st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
-
-                    w1, w2 = split_reasons(row["top_reasons"])
-                    st.caption(f"Why: {' · '.join(filter(None, [w1, w2]))}")
-
-                    if st.button("Details", key=f"det_{rank}", use_container_width=True):
-                        show_detail(row, gender, client.get("majors"))
-
-        # Compare
-        st.subheader("Compare schools")
-        compare_names = st.multiselect(
-            "Select up to 3 schools to compare side by side",
-            options=results["name"].tolist(),
-            max_selections=3,
+        # Sort selector
+        sort_option = st.selectbox(
+            "Sort by",
+            ["Best match", "Lowest cost", "Highest graduation rate"],
+            key="sort_results",
+            label_visibility="collapsed",
         )
-        if len(compare_names) >= 2:
-            sel = results[results["name"].isin(compare_names)]
-            table = {}
-            for _, r in sel.iterrows():
-                c_w1, c_w2 = split_reasons(r["top_reasons"])
-                cost      = r["cost_international"]
-                grad      = r["grad_rate"]
-                pct_i     = r["pct_international"]
-                a_shr     = r["athlete_share"]
-                aid_tier_val = r.get("athletic_aid_tier") or "No athletics"
-                aff = affil_label(r.get("religious_affil"))
-                table[r["name"]] = {
-                    "Cost/yr":          f"${cost:,.0f}" if pd.notna(cost) else "—",
-                    "Grad rate":        f"{grad:.0%}"   if pd.notna(grad) else "—",
-                    "% International":  f"{pct_i:.0%}"  if pd.notna(pct_i) else "—",
-                    "Athlete share":    f"{a_shr:.0%}"  if pd.notna(a_shr) else "—",
-                    "Association":      r.get("association") or "—",
-                    "Aid tier":         aid_tier_val,
-                    "Affiliation":      aff or "—",
-                    "F-1 certified":    "Yes" if r.get("sevp_certified") else "No",
-                    "Entrepreneurship": "Yes" if r["offers_entrepreneurship"] else "No",
-                    "Score":            f"{r['match_score']:.1f}",
-                    "Why #1":           c_w1,
-                    "Why #2":           c_w2,
-                }
-            st.dataframe(pd.DataFrame(table), use_container_width=True)
+        if sort_option == "Lowest cost":
+            sorted_results = results.sort_values("cost_international", ascending=True,
+                                                  na_position="last")
+        elif sort_option == "Highest graduation rate":
+            sorted_results = results.sort_values("grad_rate", ascending=False,
+                                                  na_position="last")
+        else:
+            sorted_results = results  # already sorted by match_score
 
-        # Full table
-        with st.expander("See all matches as a table"):
-            display = results[SHOW_COLS].copy()
-            reasons = display["top_reasons"].str.split(", ", n=1, expand=True)
-            display["why_1"] = reasons[0].map(
+        tab_cards, tab_table, tab_map = st.tabs(["Cards", "Table", "Map"])
+
+        # ── Cards tab ──────────────────────────────────────────────────────────
+        with tab_cards:
+            # Reset card counter when key filters change (use a stable hash of the client dict)
+            import hashlib, json as _json
+            _client_key = hashlib.md5(
+                _json.dumps({k: str(v) for k, v in client.items()}, sort_keys=True).encode()
+            ).hexdigest()[:8]
+            counter_key = f"cards_shown_{_client_key}"
+            if counter_key not in st.session_state:
+                st.session_state[counter_key] = 12
+
+            n_shown = st.session_state[counter_key]
+            visible = sorted_results.head(n_shown).reset_index()
+
+            card_cols = st.columns(3)
+            for i, row in visible.iterrows():
+                original_idx = row["index"]
+                rank = sorted_results.index.tolist().index(original_idx) + 1
+                with card_cols[i % 3]:
+                    with st.container(border=True):
+                        st.markdown(f"**#{rank} · {row['name']}**")
+                        st.caption(
+                            f"{row['city']}, {row['state']}  ·  {row['school_type']}  ·  "
+                            f"{row['association'] or '—'}"
+                        )
+
+                        cost = row["cost_international"]
+                        est  = row.get("est_net_cost")
+                        has_est = pd.notna(est)
+                        display_cost = est if has_est else cost
+                        if pd.notna(display_cost):
+                            cost_text = f"**${display_cost:,.0f}** per year"
+                        else:
+                            cost_text = "**Cost unknown**"
+                        st.markdown(cost_text)
+                        if has_est:
+                            pct_aided = row.get("pct_intl_aided")
+                            aided_note = (
+                                f" · {pct_aided:.0%} of internationals receive aid"
+                                if pd.notna(pct_aided)
+                                else " · aid share unknown"
+                            )
+                            st.caption(f"Estimated cost if aided{aided_note}")
+                        else:
+                            st.caption("sticker price before scholarships")
+
+                        score = float(row.get("match_score") or 50.0)
+                        score = max(0.0, min(100.0, score)) if score == score else 50.0
+                        st.progress(score / 100, text=f"Match score: {score:.1f} / 100")
+
+                        badges = []
+                        if row.get("sevp_certified"):
+                            badges.append(("F-1 certified", "green"))
+                        else:
+                            badges.append(("Not F-1 certified", "red"))
+                        if row.get("offers_intl_aid") is True:
+                            badges.append(("Intl aid", "blue"))
+                        elif row.get("athletic_aid_tier") in AID_TIERS:
+                            badges.append(("Athletic aid", "blue"))
+                        if row.get("offers_entrepreneurship"):
+                            badges.append(("Entrepreneurship", "orange"))
+                        if row.get("school_type") == "2-year" and row.get("has_transfer_track"):
+                            badges.append(("Transfer track", "violet"))
+                        row_affil = affil_label(row.get("religious_affil"))
+                        if row_affil:
+                            badges.append((row_affil, "gray"))
+                        st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
+
+                        w1, w2 = split_reasons(row["top_reasons"])
+                        st.caption(f"Why: {' · '.join(filter(None, [w1, w2]))}")
+
+                        if st.button("Details", key=f"det_{rank}", use_container_width=True):
+                            show_detail(df.loc[original_idx], gender, client.get("majors"))
+
+            total_results = len(sorted_results)
+            if n_shown < total_results:
+                remaining = total_results - n_shown
+                label = f"Show 12 more ({remaining} remaining)"
+                if st.button(label, key=f"show_more_{_client_key}"):
+                    st.session_state[counter_key] = n_shown + 12
+                    st.rerun()
+
+            # Compare (inside cards tab)
+            st.subheader("Compare schools", anchor=False)
+            compare_names = st.multiselect(
+                "Select up to 3 schools to compare side by side",
+                options=sorted_results["name"].tolist(),
+                max_selections=3,
+            )
+            if len(compare_names) >= 2:
+                sel = sorted_results[sorted_results["name"].isin(compare_names)]
+                table = {}
+                for _, r in sel.iterrows():
+                    c_w1, c_w2 = split_reasons(r["top_reasons"])
+                    cost      = r["cost_international"]
+                    grad      = r["grad_rate"]
+                    pct_i     = r["pct_international"]
+                    a_shr     = r["athlete_share"]
+                    aid_tier_val = r.get("athletic_aid_tier") or "No athletics"
+                    aff = affil_label(r.get("religious_affil"))
+                    table[r["name"]] = {
+                        "Cost/yr":          f"${cost:,.0f}" if pd.notna(cost) else "—",
+                        "Grad rate":        f"{grad:.0%}"   if pd.notna(grad) else "—",
+                        "% International":  f"{pct_i:.0%}"  if pd.notna(pct_i) else "—",
+                        "Athlete share":    f"{a_shr:.0%}"  if pd.notna(a_shr) else "—",
+                        "Association":      r.get("association") or "—",
+                        "Aid tier":         aid_tier_val,
+                        "Affiliation":      aff or "—",
+                        "F-1 certified":    "Yes" if r.get("sevp_certified") else "No",
+                        "Entrepreneurship": "Yes" if r["offers_entrepreneurship"] else "No",
+                        "Score":            f"{r['match_score']:.1f}",
+                        "Why #1":           c_w1,
+                        "Why #2":           c_w2,
+                    }
+                st.dataframe(pd.DataFrame(table), use_container_width=True)
+
+        # ── Table tab ──────────────────────────────────────────────────────────
+        with tab_table:
+            display = sorted_results[SHOW_COLS].copy()
+            reasons_split = display["top_reasons"].str.split(", ", n=1, expand=True)
+            display["why_1"] = reasons_split[0].map(
                 lambda x: FEATURE_LABELS.get(str(x).strip(), str(x).strip()) if pd.notna(x) else ""
             )
             display["why_2"] = (
-                reasons[1] if 1 in reasons.columns else pd.Series("", index=display.index)
+                reasons_split[1] if 1 in reasons_split.columns
+                else pd.Series("", index=display.index)
             ).map(lambda x: FEATURE_LABELS.get(str(x).strip(), str(x).strip()) if pd.notna(x) else "")
             display = display.drop(columns=["top_reasons"])
             display["cost_international"] = display["cost_international"].apply(
@@ -772,10 +853,35 @@ with tab_find:
                 "2-year grad rates understate success because early transfers count as non-completers. "
                 "Scores are relative to this client's filtered pool (0–100), not absolute quality."
             )
-            csv = results[SHOW_COLS].to_csv(index=False).encode()
+            csv = sorted_results[SHOW_COLS].to_csv(index=False).encode()
             st.download_button("Download results (CSV)", csv, "college_match_results.csv", "text/csv")
 
-        # Funnel
+        # ── Map tab ────────────────────────────────────────────────────────────
+        with tab_map:
+            map_df = sorted_results[
+                ["name", "city", "state", "lat", "lon", "cost_international", "match_score"]
+            ].dropna(subset=["lat", "lon"]).reset_index(drop=True).copy()
+            map_df["rank"]     = map_df.index + 1
+            map_df["is_top6"]  = map_df["rank"] <= 6
+            map_df["color"]    = map_df["is_top6"].apply(
+                lambda t: PRIMARY_RGB + [230] if t else [150, 150, 150, 160])
+            map_df["radius"]   = map_df["is_top6"].apply(lambda t: 55_000 if t else 38_000)
+            map_df["cost_fmt"] = map_df["cost_international"].apply(
+                lambda x: f"${x:,.0f}" if pd.notna(x) else "—")
+            layer = pdk.Layer(
+                "ScatterplotLayer", data=map_df,
+                get_position="[lon, lat]", get_fill_color="color", get_radius="radius", pickable=True,
+            )
+            view = pdk.ViewState(latitude=38.5, longitude=-96.5, zoom=3, pitch=0)
+            tooltip = {
+                "html": "<b>{name}</b><br/>{city}, {state}<br/>Cost: {cost_fmt}/yr<br/>Score: {match_score}",
+                "style": {"backgroundColor": "white", "color": "#1A1A1A",
+                          "padding": "8px", "borderRadius": "4px", "fontSize": "13px"},
+            }
+            st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view, tooltip=tooltip))
+            st.caption("Top 6 in green · remaining matches in gray · hover for details.")
+
+        # ── Funnel (always visible below tabs) ────────────────────────────────
         with st.expander("Filter funnel"):
             pretty_funnel = []
             for step, n in funnel:
@@ -787,38 +893,13 @@ with tab_find:
                 use_container_width=False, hide_index=True,
             )
 
-        # Map
-        st.subheader("Where they are")
-        map_df = results[
-            ["name", "city", "state", "lat", "lon", "cost_international", "match_score"]
-        ].dropna(subset=["lat", "lon"]).reset_index(drop=True).copy()
-        map_df["rank"]     = map_df.index + 1
-        map_df["is_top6"]  = map_df["rank"] <= 6
-        map_df["color"]    = map_df["is_top6"].apply(
-            lambda t: PRIMARY_RGB + [230] if t else [150, 150, 150, 160])
-        map_df["radius"]   = map_df["is_top6"].apply(lambda t: 55_000 if t else 38_000)
-        map_df["cost_fmt"] = map_df["cost_international"].apply(
-            lambda x: f"${x:,.0f}" if pd.notna(x) else "—")
-        layer = pdk.Layer(
-            "ScatterplotLayer", data=map_df,
-            get_position="[lon, lat]", get_fill_color="color", get_radius="radius", pickable=True,
-        )
-        view = pdk.ViewState(latitude=38.5, longitude=-96.5, zoom=3, pitch=0)
-        tooltip = {
-            "html": "<b>{name}</b><br/>{city}, {state}<br/>Cost: {cost_fmt}/yr<br/>Score: {match_score}",
-            "style": {"backgroundColor": "white", "color": "#1A1A1A",
-                      "padding": "8px", "borderRadius": "4px", "fontSize": "13px"},
-        }
-        st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view, tooltip=tooltip))
-        st.caption("Top 6 in green · remaining matches in gray · hover for details.")
-
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 2 — How it works
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_how:
 
     # ── How matching works ─────────────────────────────────────────────────────
-    st.header("How matching works")
+    st.header("How matching works", anchor=False)
     st.markdown(
         """
 **1 · Must-haves remove schools that can't work**
@@ -843,13 +924,13 @@ mostly because of a preference you don't actually care about, lower that weight 
     )
 
     # ── What each preference means ────────────────────────────────────────────
-    st.header("What each preference means")
+    st.header("What each preference means", anchor=False)
     for k in WEIGHT_KEYS:
         with st.expander(FEATURE_LABELS[k]):
             st.markdown(FEATURE_HELP[k])
 
     # ── Where the data comes from ─────────────────────────────────────────────
-    st.header("Where the data comes from")
+    st.header("Where the data comes from", anchor=False)
     col_a, col_b = st.columns(2)
     with col_a:
         st.markdown("**College Scorecard**")
@@ -887,7 +968,7 @@ mostly because of a preference you don't actually care about, lower that weight 
         st.link_button("commondataset.org ↗", "https://www.commondataset.org")
 
     # ── Limitations ───────────────────────────────────────────────────────────
-    st.header("What this tool can't tell you")
+    st.header("What this tool can't tell you", anchor=False)
     st.markdown(
         """
 - **You'll probably pay less than the listed cost.** The prices shown are official sticker prices

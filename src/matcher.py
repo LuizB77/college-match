@@ -3,6 +3,8 @@ Core matching logic extracted verbatim from notebooks/04_match.ipynb.
 Do not change scoring weights here without also updating the notebook.
 """
 
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 
@@ -52,14 +54,14 @@ def load_data(path="data/processed/schools_with_majors.csv") -> pd.DataFrame:
     return df
 
 
-def match(df: pd.DataFrame, client: dict, top_n: int = 25):
+def match(df: pd.DataFrame, client: dict, top_n: int | None = None):
     """
     Apply hard filters then rank by weighted score (verbatim from notebook 04 cell 3).
 
     Returns
     -------
     results_df : pd.DataFrame
-        Top `top_n` schools sorted by match_score descending.
+        All passing schools sorted by match_score descending (or top_n if given).
     funnel : list[tuple[str, int]]
         (step_label, count_remaining) after each filter.
     """
@@ -172,5 +174,113 @@ def match(df: pd.DataFrame, client: dict, top_n: int = 25):
         c["match_score"] = 50.0          # all weights zero → equal score, no ranking
     c["top_reasons"] = contrib.apply(lambda r: ", ".join(r.nlargest(2).index), axis=1)
 
-    results = c.sort_values("match_score", ascending=False).head(top_n)
+    results = c.sort_values("match_score", ascending=False)
+    if top_n is not None:
+        results = results.head(top_n)
     return results, funnel
+
+
+def explain_exclusion(row: pd.Series, client: dict) -> list[str]:
+    """
+    Return a list of plain-English reasons why *row* fails the hard filters in *client*.
+
+    An empty list means the school passes all filters (it would appear in match() results).
+    Reuses the exact same rules as match() so the two can never disagree.
+    """
+    reasons = []
+
+    if client.get("require_f1", True):
+        if not row.get("sevp_certified"):
+            reasons.append("Not F-1 certified (SEVP)")
+
+    if row.get("school_type") not in client["school_types"]:
+        reasons.append(f"School type '{row.get('school_type')}' not in {client['school_types']}")
+
+    if client.get("states"):
+        if row.get("state") not in client["states"]:
+            reasons.append(f"State {row.get('state')} not in selected states")
+
+    if client.get("city_groups"):
+        # Compute city_group the same way load_data does
+        raw_size = row.get("city_size")
+        city_group = None
+        if pd.notna(raw_size):
+            s = str(raw_size).lower()
+            for k in ["city", "suburb", "town", "rural"]:
+                if k in s:
+                    city_group = k.capitalize()
+                    break
+        if city_group not in client["city_groups"]:
+            reasons.append(f"City size '{city_group}' not in {client['city_groups']}")
+
+    religion = client.get("religion")
+    if religion:
+        _none_affil = {-1, -2}
+        affil = row.get("religious_affil")
+        affil_int = None
+        try:
+            affil_int = int(affil) if pd.notna(affil) else None
+        except (TypeError, ValueError):
+            pass
+        if religion == "catholic":
+            if affil_int != 30:
+                reasons.append("Not Catholic-affiliated")
+        elif religion == "any_religious":
+            if affil_int is None or affil_int in _none_affil:
+                reasons.append("No stated religious affiliation")
+        elif religion == "non_religious":
+            if affil_int is not None and affil_int not in _none_affil:
+                reasons.append("Has a religious affiliation")
+
+    max_budget = client.get("max_budget")
+    if max_budget is not None:
+        limit = max_budget * client.get("budget_flex", 1.0)
+        cost = row.get("cost_international")
+        if pd.isna(cost) or cost > limit:
+            cost_str = f"${cost:,.0f}" if pd.notna(cost) else "unknown"
+            reasons.append(f"Cost {cost_str} is over the ${limit:,.0f} budget")
+
+    if client.get("sport"):
+        col = "mens_sports" if client.get("gender") == "men" else "womens_sports"
+        sports_raw = row.get(col)
+        sports_raw = sports_raw if pd.notna(sports_raw) else ""
+        sports_list = [x.strip() for x in str(sports_raw).split(";")]
+        if client["sport"] not in sports_list:
+            gender_label = client.get("gender", "men")
+            reasons.append(f"No {gender_label}'s {client['sport']} team")
+
+    if client.get("needs_athletic_scholarship"):
+        tier = row.get("athletic_aid_tier")
+        if tier not in ("Athletic scholarships", "Mixed / verify"):
+            reasons.append("No athletic scholarships in its division")
+
+    mg4 = client.get("min_grad_rate_4yr")
+    mg2 = client.get("min_grad_rate_2yr")
+    if mg4 or mg2:
+        threshold = mg4 if row.get("school_type") == "4-year" else (mg2 or 0)
+        if threshold:
+            grad = row.get("grad_rate")
+            if pd.notna(grad) and grad < threshold:
+                reasons.append(
+                    f"Graduation rate {grad:.0%} is below the {threshold:.0%} minimum"
+                )
+
+    if client.get("majors"):
+        prefixes = client["majors"]
+
+        def has_major(cips):
+            return any(c.startswith(p) for c in str(cips).split(";") if c for p in prefixes)
+
+        programs_known = row.get("programs_known", False)
+        strict = client.get("strict_major", False)
+        if programs_known:
+            if row.get("school_type") == "4-year":
+                if not has_major(row.get("bachelor_cips", "")):
+                    reasons.append(f"Doesn't offer {', '.join(prefixes)} programs")
+            else:
+                if not has_major(row.get("associate_cips", "")) and not (
+                    not strict and row.get("has_transfer_track")
+                ):
+                    reasons.append(f"Doesn't offer {', '.join(prefixes)} programs")
+
+    return reasons
