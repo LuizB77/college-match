@@ -19,17 +19,45 @@ This project matches Brazilian and other international student-athletes to US co
 
 ## Testing
 
-Run `.venv/bin/python -m pytest` before every push. The suite covers:
+### Unit + integration tests (local)
 
-- `test_matcher_top15` — direct `match()` call must reproduce the exact notebook-04 top-15 baseline (saved in `tests/expected_top15.json`)
-- `test_matcher_zero_weights_no_nan` — all weights = 0 must not produce NaN scores
-- `test_matcher_religion_catholic` — Catholic filter appears as a funnel step and reduces school count
-- `test_matcher_max_budget_none_includes_unknown_cost` — no-budget mode adds no cost step to the funnel
-- `test_defaults_load` — app loads with no exception; "Schools that fit" = 3147
-- `test_athlete_profile` — notebook-04 athlete profile via sidebar session state keys; no exception
-- `test_catholic_filter` — religion = Catholic via AppTest; count < 3147
-- `test_zero_weights_no_crash` — all sliders at "Don't care"; no `st.progress` crash
-- `test_clear_all` — restrictive filters then "Clear all filters" button returns count to 3147
+```bash
+.venv/bin/python -m pytest tests/ -v
+```
+
+Run this before every push. The suite covers matcher correctness, explain_exclusion consistency, program_strength, selectivity tiers, hidden gems, Ivy League flags, and Streamlit AppTest integration.
+
+### Deploy smoke-test (must run after every push)
+
+```bash
+bash scripts/check_deploy.sh
+```
+
+This script clones `origin/main` into a temp directory, creates a **fresh venv** from `requirements.txt` only (no local packages), installs `pytest`, and runs the full test suite. It catches any "works locally, fails in prod" regressions — missing exports, modules that need to be added to `requirements.txt`, files that were not committed, or anything that depends on local state.
+
+**Always run `check_deploy.sh` after pushing** — it is the closest approximation to what the live app actually sees.
+
+### Test descriptions
+
+| Test | What it checks |
+|---|---|
+| `test_matcher_top15` | `match()` reproduces the notebook-04 top-15 baseline exactly |
+| `test_match_returns_all_passing` | `match()` with no `top_n` returns all schools that pass filters |
+| `test_f1_metric_equals_sevp_count` | F-1 metric equals total SEVP-certified schools in the dataset |
+| `test_matcher_zero_weights_no_nan` | All-zero weights produce no NaN scores |
+| `test_matcher_religion_catholic` | Catholic filter appears in funnel and reduces count |
+| `test_matcher_max_budget_none_includes_unknown_cost` | No-budget mode skips the cost funnel step |
+| `test_explain_exclusion_*` | `explain_exclusion()` is consistent with `match()` for 200-school sample |
+| `test_program_earnings_file` | `program_earnings.csv` has correct columns and positive earnings |
+| `test_selectivity_tier_thresholds` | Reach / Target / Likely / Unknown thresholds are correct |
+| `test_ivy_league_unit_ids` | All 8 Ivy League schools identified by unit_id |
+| `test_program_strength_in_match` | `program_strength` weight produces valid scores |
+| `test_hidden_gems_only` | Hidden gems filter removes Reach schools and reduces count |
+| `test_defaults_load` | App loads with no exception; "Schools that fit" = 3147 |
+| `test_athlete_profile` | Athlete profile via sidebar session state; no exception |
+| `test_catholic_filter` | Catholic filter via AppTest; count < 3147 |
+| `test_zero_weights_no_crash` | All sliders at "Don't care"; no `st.progress` crash |
+| `test_clear_all` | Restrictive filters → Clear → count returns to 3147 |
 
 ## Known limitations
 
