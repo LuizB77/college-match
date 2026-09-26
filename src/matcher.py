@@ -78,6 +78,37 @@ def selectivity_tier(admit_rate) -> str:
     return "Likely"
 
 
+def _has_real_earnings(
+    unit_id,
+    major_prefixes: list[str] | None,
+    program_earnings: pd.DataFrame | None,
+    median_earn=None,
+) -> bool:
+    """True when the school has enough real earnings data for the hidden-gems filter.
+
+    No major → requires non-NaN median_earnings_10yr.
+    With major → requires at least one program row with earn_n >= 20 for the major prefix.
+    """
+    if not major_prefixes:
+        return pd.notna(median_earn)
+    if program_earnings is None:
+        return False
+    try:
+        uid = float(unit_id)
+    except (TypeError, ValueError):
+        return False
+
+    def _pm(cip4: str) -> bool:
+        return any(cip4.startswith(p) for p in major_prefixes)
+
+    pe = program_earnings[
+        (program_earnings["unit_id"] == uid) &
+        program_earnings["cip4"].astype(str).apply(_pm) &
+        (program_earnings["earn_n"] >= 20)
+    ]
+    return not pe.empty
+
+
 def _program_strength_percentiles(
     df: pd.DataFrame,
     major_prefixes: list[str] | None,
@@ -105,7 +136,7 @@ def _program_strength_percentiles(
     def _prefix_match(cip4: str) -> bool:
         return any(cip4.startswith(p) for p in major_prefixes)
 
-    pe = program_earnings[program_earnings["cip4"].apply(_prefix_match)].copy()
+    pe = program_earnings[program_earnings["cip4"].astype(str).apply(_prefix_match)].copy()
     pe = pe[pe["earn_n"] >= 20]   # drop programs with < 20 graduates; too few to be reliable
     if pe.empty:
         return result
@@ -263,6 +294,26 @@ def match(
     if client.get("hidden_gems_only"):
         _pg_strength = _program_strength_percentiles(c, client.get("majors"), program_earnings)
 
+        # Real earnings: school must have actual qualifying data, not just the 0.5 fill
+        _majors = client.get("majors")
+        if not _majors:
+            real_earn_mask = (
+                c["median_earnings_10yr"].notna()
+                if "median_earnings_10yr" in c.columns
+                else pd.Series(False, index=c.index)
+            )
+        else:
+            if program_earnings is not None:
+                def _pm_match(cip4: str) -> bool:
+                    return any(cip4.startswith(p) for p in _majors)
+                _pe_q = program_earnings[
+                    program_earnings["cip4"].astype(str).apply(_pm_match) & (program_earnings["earn_n"] >= 20)
+                ]
+                _schools_with_real = set(_pe_q["unit_id"].astype(float).unique())
+            else:
+                _schools_with_real = set()
+            real_earn_mask = c["unit_id"].astype(float).isin(_schools_with_real)
+
         # Admit rate >= 30% or open admission (stored as 0)
         def _admit_ok(row):
             ar = row.get("admit_rate")
@@ -279,7 +330,7 @@ def match(
             c_links   = c["unit_id"].map(max_links).fillna(0)
             alum_mask = c_links < 60
 
-        mask = (_pg_strength >= 0.75) & admit_mask & alum_mask
+        mask = real_earn_mask & (_pg_strength >= 0.75) & admit_mask & alum_mask
         c = c[mask]
         funnel.append(("After hidden gems filter", len(c)))
 
@@ -451,9 +502,16 @@ def explain_exclusion(
                         alum_name = str(top_alum.get("name", "a famous alumnus"))
                         reasons.append(f"Too well known: alumni include {alum_name}")
 
-        # Program strength must be in the top 25%
-        if full_df is not None:
-            ps_series = _program_strength_percentiles(full_df, client.get("majors"), program_earnings)
+        # Earnings data: must have real qualifying data (not the 0.5 fill)
+        _majors = client.get("majors")
+        has_real = _has_real_earnings(
+            row.get("unit_id"), _majors, program_earnings, row.get("median_earnings_10yr")
+        )
+        if not has_real:
+            reasons.append("Not enough graduate earnings data to judge")
+        elif full_df is not None:
+            # Only check program strength when we have real data to judge against
+            ps_series = _program_strength_percentiles(full_df, _majors, program_earnings)
             ps_val = ps_series.get(row.name, 0.5)
             if ps_val < 0.75:
                 reasons.append("Not a hidden gem: graduate outcomes below the top quarter")

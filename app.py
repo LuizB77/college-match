@@ -65,8 +65,24 @@ def _git_file_date(rel_path: str) -> str:
     except Exception:
         return "unknown"
 
-_DATA_DATE_SCORECARD = "2022–23"
-_DATA_DATE_EADA      = "2024–25"
+def _eada_info() -> tuple[str, str]:
+    """Return (survey_year_str, release_year_str) from EADA filename.
+    e.g. 'InstlevelDataDoc2025.doc' → ('2024–25', '2025').
+    """
+    eada_dir = Path(__file__).parent / "data" / "raw" / "eada"
+    docs = sorted(eada_dir.glob("InstlevelDataDoc*.doc"))
+    if not docs:
+        return "unknown", "unknown"
+    m = _re.search(r"(\d{4})", docs[-1].name)
+    if not m:
+        return "unknown", "unknown"
+    yr = int(m.group(1))
+    return f"{yr - 1}–{str(yr)[2:]}", str(yr)
+
+_EADA_SURVEY_YEAR, _EADA_RELEASE_YEAR = _eada_info()
+_SCORECARD_DATE  = _git_file_date("data/processed/schools_with_majors.csv")
+_DATA_DATE_SCORECARD = f"released {_SCORECARD_DATE}, covers 2022–23 academic year"
+_DATA_DATE_EADA      = f"{_EADA_SURVEY_YEAR} survey (released {_EADA_RELEASE_YEAR})"
 _DATA_DATE_SEVP      = _sevp_list_date()
 _DATA_DATE_WIKIDATA  = _git_file_date("data/processed/notable_alumni.csv")
 
@@ -1446,7 +1462,7 @@ marketed internationally.
         st.markdown(
             "Costs, enrollment, graduation rates, and program offerings. "
             "Published by the U.S. Department of Education. "
-            "Data year: 2022–23 academic year."
+            f"Data: {_DATA_DATE_SCORECARD}."
         )
         st.link_button("collegescorecard.ed.gov/data ↗", "https://collegescorecard.ed.gov/data")
 
@@ -1463,7 +1479,7 @@ marketed internationally.
         st.markdown(
             "Sport rosters, athletic aid, division, and athletics spending. "
             "Submitted annually by schools to the U.S. Department of Education. "
-            "Survey year: 2024–25."
+            f"Data: {_DATA_DATE_EADA}."
         )
         st.link_button("ope.ed.gov/athletics ↗", "https://ope.ed.gov/athletics")
 

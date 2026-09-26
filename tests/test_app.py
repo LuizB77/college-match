@@ -429,6 +429,38 @@ def test_hidden_gems_only(df, program_earnings):
     assert any("hidden gem" in s.lower() for s in steps), f"Expected hidden gems step in funnel: {steps}"
 
 
+def test_hidden_gems_no_earnings_excluded(df, program_earnings):
+    """Schools with no qualifying program earnings must never appear in hidden gems."""
+    OAKWOOD_UID = 101912  # Oakwood University AL: has CIP 52 bachelor_cips but no earn_n>=20 rows
+    assert OAKWOOD_UID in df["unit_id"].values, "Oakwood not in dataset"
+
+    if program_earnings is not None:
+        oak_pe = program_earnings[
+            (program_earnings["unit_id"] == OAKWOOD_UID) &
+            (program_earnings["cip4"].astype(str).str.startswith("52")) &
+            (program_earnings["earn_n"] >= 20)
+        ]
+        assert oak_pe.empty, f"Oakwood unexpectedly has qualifying earnings: {oak_pe}"
+
+    client = {
+        "name": "gems-no-data-test",
+        "require_f1": False, "max_budget": None, "budget_flex": 1.5,
+        "school_types": ["4-year"], "states": None, "city_groups": None,
+        "sport": None, "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": ["52"], "strict_major": False, "religion": None,
+        "hidden_gems_only": True,
+        "weights": {"low_cost": 1, "grad_rate": 0, "sport_culture": 0,
+                    "athlete_opportunity": 0, "international_community": 0,
+                    "open_admission": 0, "small_school": 0,
+                    "entrepreneurship_program": 0, "program_strength": 0},
+    }
+    results, _ = match(df, client, program_earnings=program_earnings)
+    assert OAKWOOD_UID not in results["unit_id"].values, (
+        "Oakwood (no qualifying earnings) must not appear in hidden gems results"
+    )
+
+
 # ---------------------------------------------------------------------------
 # App integration tests (Streamlit AppTest)
 # ---------------------------------------------------------------------------
