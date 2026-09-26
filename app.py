@@ -35,6 +35,7 @@ DATA_PATH     = Path(__file__).parent / "data" / "processed" / "schools_with_maj
 CIP_PATH      = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
 AID_PATH      = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
 EARN_PATH     = Path(__file__).parent / "data" / "processed" / "program_earnings.csv"
+ALUMNI_PATH   = Path(__file__).parent / "data" / "processed" / "notable_alumni.csv"
 
 MAJOR_OPTIONS = {
     "None":               None,
@@ -237,6 +238,16 @@ def get_program_earnings(path_str: str):
 
 
 @st.cache_data
+def get_alumni(path_str: str):
+    p = Path(path_str)
+    if not p.exists():
+        return None
+    a = pd.read_csv(p, dtype={"unit_id": int, "sitelinks": int})
+    a["has_pt_wiki"] = a["has_pt_wiki"].astype(bool)
+    return a
+
+
+@st.cache_data
 def get_intl_aid() -> pd.DataFrame:
     """Load manually curated international aid data. Returns empty df if file is missing."""
     if not AID_PATH.exists():
@@ -260,6 +271,13 @@ df               = get_data(os.path.getmtime(DATA_PATH))
 cip_lookup       = get_cip_lookup()
 intl_aid         = get_intl_aid()
 program_earnings = get_program_earnings(str(EARN_PATH))
+alumni_df        = get_alumni(str(ALUMNI_PATH))
+
+# Precompute which unit_ids have a "famous" alum (≥20 Wikipedia languages)
+_famous_school_ids: set = (
+    set(alumni_df[alumni_df["sitelinks"] >= 20]["unit_id"].unique())
+    if alumni_df is not None else set()
+)
 
 if not intl_aid.empty:
     df = df.merge(intl_aid, left_on="unit_id", right_on="unitid", how="left")
@@ -337,9 +355,10 @@ def _program_list(cips_str: str, major_prefixes):
 
 
 # ── School detail dialog ───────────────────────────────────────────────────────
-@st.dialog("School details")
+@st.dialog("School details", width="large")
 def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
-    name = row["name"]
+    name    = row["name"]
+    unit_id = row.get("unit_id")
     st.header(name, anchor=False)
 
     city_size = row.get("city_size") or "—"
@@ -354,210 +373,236 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
         f"👥 {enrollment_str} undergraduates"
     )
 
-    # Cost
-    st.subheader("Cost", anchor=False)
-    cost_intl = row.get("cost_international")
-    cost_oos  = row.get("tuition_out_of_state")
-    est_net   = row.get("est_net_cost")
-    col1, col2 = st.columns(2)
-    col1.metric("International estimate / yr", f"${cost_intl:,.0f}" if pd.notna(cost_intl) else "—")
-    col2.metric("Out-of-state tuition",        f"${cost_oos:,.0f}"  if pd.notna(cost_oos)  else "—")
-    st.caption("Sticker prices before scholarships or financial aid.")
+    left, right = st.columns(2)
 
-    # International Aid
-    if row.get("offers_intl_aid") is not None:
-        st.subheader("International Financial Aid", anchor=False)
-        avg_award = row.get("avg_intl_award")
-        pct_aided = row.get("pct_intl_aided")
-        cds_yr    = row.get("cds_year")
-        src_url   = row.get("source_url")
-        a1, a2, a3 = st.columns(3)
-        a1.metric("Offers need-based intl aid", "Yes" if row.get("offers_intl_aid") else "No")
-        a2.metric("Avg award / yr",  f"${avg_award:,.0f}" if pd.notna(avg_award) else "Not reported")
-        a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
-        flags_aid = []
-        if row.get("meets_full_need_intl"):
-            flags_aid.append("Meets 100% of demonstrated need")
-        if row.get("need_blind_intl"):
-            flags_aid.append("Need-blind admission")
-        if pct_aided and pd.notna(pct_aided):
-            flags_aid.append(f"{pct_aided:.0%} of international students receive aid")
-        else:
-            flags_aid.append("Aid share unknown")
-        if flags_aid:
-            st.markdown("  ·  ".join(flags_aid))
-        caption_parts = []
-        if cds_yr and str(cds_yr) not in ("None", "nan"):
-            caption_parts.append(f"CDS year: {cds_yr}")
-        st.caption(
-            "Source: Common Data Set (Section H6). "
-            + ("  ·  ".join(caption_parts) if caption_parts else "")
-        )
-        if src_url and str(src_url) not in ("None", "nan", "TODO"):
-            st.link_button("View Common Data Set ↗", url=str(src_url))
+    # ── LEFT COLUMN: Cost · Aid · Athletics ───────────────────────────────────
+    with left:
+        # Cost
+        st.subheader("Cost", anchor=False)
+        cost_intl = row.get("cost_international")
+        cost_oos  = row.get("tuition_out_of_state")
+        est_net   = row.get("est_net_cost")
+        col1, col2 = st.columns(2)
+        col1.metric("International estimate / yr", f"${cost_intl:,.0f}" if pd.notna(cost_intl) else "—")
+        col2.metric("Out-of-state tuition",        f"${cost_oos:,.0f}"  if pd.notna(cost_oos)  else "—")
+        st.caption("Sticker prices before scholarships or financial aid.")
 
-    # Athletics
-    if row.get("has_athletics"):
-        st.subheader("Athletics", anchor=False)
-        aid_tier = row.get("athletic_aid_tier") or "—"
-        division = row.get("association") or "—"
-        aid_col = "aid_per_athlete_men" if selected_gender == "men" else "aid_per_athlete_women"
-        aid_val  = row.get(aid_col)
-        aid_str  = f"${aid_val:,.0f} / yr" if pd.notna(aid_val) and aid_val > 0 else "Not reported"
-
-        sports_col = "mens_sports" if selected_gender == "men" else "womens_sports"
-        sports_raw = row.get(sports_col) or ""
-        sports_list = [s.strip() for s in sports_raw.split(";") if s.strip()]
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Division / association", division)
-        c2.metric("Aid tier",               aid_tier)
-        c3.metric(f"Avg aid per {selected_gender}'s athlete", aid_str)
-
-        if sports_list:
-            st.markdown(f"**{selected_gender.capitalize()}'s sports offered:** " + " · ".join(sports_list))
-    else:
-        st.caption("No athletics reported for this school.")
-
-    # Academics
-    st.subheader("Academics", anchor=False)
-    grad = row.get("grad_rate")
-    grad_str = f"{grad:.0%}" if pd.notna(grad) else "—"
-    if row["school_type"] == "2-year" and pd.notna(grad):
-        grad_str += " *(understates success — students who transfer early count as non-completers)*"
-    pct_intl = row.get("pct_international")
-    pct_str  = f"{pct_intl:.0%}" if pd.notna(pct_intl) else "—"
-
-    c1, c2 = st.columns(2)
-    c1.markdown(f"**Grad rate:** {grad_str}")
-    c2.markdown(f"**International students:** {pct_str}")
-
-    flags = []
-    if row.get("has_transfer_track"):
-        flags.append("Transfer track (Liberal Arts, CIP 24.01)")
-    if row.get("offers_entrepreneurship"):
-        flags.append("Entrepreneurship program (CIP 52.07)")
-    if row.get("open_admission"):
-        flags.append("Open admission")
-    if flags:
-        st.markdown("**Programs & policies:** " + " · ".join(flags))
-
-    # Programs
-    assoc_progs = _program_list(row.get("associate_cips", ""), major_prefixes)
-    bach_progs  = _program_list(row.get("bachelor_cips",  ""), major_prefixes)
-
-    if assoc_progs or bach_progs:
-        st.subheader("Programs offered", anchor=False)
-        total_prog_count = len(assoc_progs) + len(bach_progs)
-        if major_prefixes:
-            main_assoc = [(m, n) for m, n in assoc_progs if m]
-            main_bach  = [(m, n) for m, n in bach_progs  if m]
-            if not main_assoc and not main_bach:
-                st.caption("No programs found for this major at this school.")
+        # International Aid
+        if row.get("offers_intl_aid") is not None:
+            st.subheader("International Financial Aid", anchor=False)
+            avg_award = row.get("avg_intl_award")
+            pct_aided = row.get("pct_intl_aided")
+            cds_yr    = row.get("cds_year")
+            src_url   = row.get("source_url")
+            a1, a2, a3 = st.columns(3)
+            a1.metric("Offers need-based intl aid", "Yes" if row.get("offers_intl_aid") else "No")
+            a2.metric("Avg award / yr",  f"${avg_award:,.0f}" if pd.notna(avg_award) else "Not reported")
+            a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
+            flags_aid = []
+            if row.get("meets_full_need_intl"):
+                flags_aid.append("Meets 100% of demonstrated need")
+            if row.get("need_blind_intl"):
+                flags_aid.append("Need-blind admission")
+            if pct_aided and pd.notna(pct_aided):
+                flags_aid.append(f"{pct_aided:.0%} of international students receive aid")
             else:
-                if main_assoc:
-                    st.markdown("**Associate's degrees**")
-                    for _, pname in main_assoc:
-                        st.markdown(f"&nbsp;&nbsp;★ {pname}", unsafe_allow_html=True)
-                if main_bach:
-                    st.markdown("**Bachelor's degrees**")
-                    for _, pname in main_bach:
-                        st.markdown(f"&nbsp;&nbsp;★ {pname}", unsafe_allow_html=True)
-                st.caption("★ = matches your selected major")
+                flags_aid.append("Aid share unknown")
+            if flags_aid:
+                st.markdown("  ·  ".join(flags_aid))
+            caption_parts = []
+            if cds_yr and str(cds_yr) not in ("None", "nan"):
+                caption_parts.append(f"CDS year: {cds_yr}")
+            st.caption(
+                "Source: Common Data Set (Section H6). "
+                + ("  ·  ".join(caption_parts) if caption_parts else "")
+            )
+            if src_url and str(src_url) not in ("None", "nan", "TODO"):
+                st.link_button("View Common Data Set ↗", url=str(src_url))
+
+        # Athletics
+        if row.get("has_athletics"):
+            st.subheader("Athletics", anchor=False)
+            aid_tier = row.get("athletic_aid_tier") or "—"
+            division = row.get("association") or "—"
+            aid_col = "aid_per_athlete_men" if selected_gender == "men" else "aid_per_athlete_women"
+            aid_val  = row.get(aid_col)
+            aid_str  = f"${aid_val:,.0f} / yr" if pd.notna(aid_val) and aid_val > 0 else "Not reported"
+
+            sports_col = "mens_sports" if selected_gender == "men" else "womens_sports"
+            sports_raw = row.get(sports_col) or ""
+            sports_list = [s.strip() for s in sports_raw.split(";") if s.strip()]
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Division / association", division)
+            c2.metric("Aid tier",               aid_tier)
+            c3.metric(f"Avg aid per {selected_gender}'s athlete", aid_str)
+
+            if sports_list:
+                st.markdown(f"**{selected_gender.capitalize()}'s sports offered:** " + " · ".join(sports_list))
         else:
-            combined = assoc_progs + bach_progs
-            for _, pname in combined[:8]:
-                st.markdown(f"&nbsp;&nbsp;· {pname}", unsafe_allow_html=True)
-        with st.expander(f"See all {total_prog_count} programs"):
-            if assoc_progs:
-                st.markdown("**Associate's degrees**")
-                for is_match, pname in assoc_progs:
-                    prefix = "★ " if is_match else "· "
-                    st.markdown(f"&nbsp;&nbsp;{prefix}{pname}", unsafe_allow_html=True)
-            if bach_progs:
-                st.markdown("**Bachelor's degrees**")
-                for is_match, pname in bach_progs:
-                    prefix = "★ " if is_match else "· "
-                    st.markdown(f"&nbsp;&nbsp;{prefix}{pname}", unsafe_allow_html=True)
-            if major_prefixes:
-                st.caption("★ = matches your selected major")
-    else:
-        st.caption("No program data available in the College Scorecard for this school.")
+            st.caption("No athletics reported for this school.")
 
-    # Admissions
-    st.subheader("Admissions", anchor=False)
-    admit = row.get("admit_rate")
-    tier = row.get("selectivity_tier") or selectivity_tier(admit)
-    tier_color = {"Reach": "red", "Target": "orange", "Likely": "green"}.get(tier, "gray")
-    admit_str = f"{admit:.0%}" if pd.notna(admit) else "—"
-    st.markdown(f"**Selectivity:** :{tier_color}-badge[{tier}]  ·  Admit rate: {admit_str}")
-    st.caption(
-        "Selectivity is based on admit rate only; it doesn't know the student's grades."
-    )
-    test_raw = row.get("test_policy")
-    if pd.notna(test_raw):
-        try:
-            test_label = ADMCON7_LABELS.get(int(test_raw), f"Code {int(test_raw)}")
-        except (TypeError, ValueError):
-            test_label = str(test_raw)
-        st.markdown(f"**Test score policy:** {test_label}")
-    r25 = row.get("sat_read_25")
-    r75 = row.get("sat_read_75")
-    m25 = row.get("sat_math_25")
-    m75 = row.get("sat_math_75")
-    sat_parts = []
-    if pd.notna(r25) and pd.notna(r75):
-        sat_parts.append(f"Reading: {int(r25)}–{int(r75)}")
-    if pd.notna(m25) and pd.notna(m75):
-        sat_parts.append(f"Math: {int(m25)}–{int(m75)}")
-    if sat_parts:
-        st.markdown("**SAT 25th–75th percentile:** " + "  ·  ".join(sat_parts))
-    if row.get("ivy_league") or (row.get("unit_id") in IVY_UNIT_IDS):
-        st.info(
-            "No athletic scholarships; financial aid is need-based only.",
-            icon="🏛️",
-        )
+    # ── RIGHT COLUMN: Academics · Programs · Admissions · Outcomes ───────────
+    with right:
+        # Academics
+        st.subheader("Academics", anchor=False)
+        grad = row.get("grad_rate")
+        grad_str = f"{grad:.0%}" if pd.notna(grad) else "—"
+        if row["school_type"] == "2-year" and pd.notna(grad):
+            grad_str += " *(understates success — students who transfer early count as non-completers)*"
+        pct_intl = row.get("pct_international")
+        pct_str  = f"{pct_intl:.0%}" if pd.notna(pct_intl) else "—"
 
-    # Program outcomes
-    unit_id = row.get("unit_id")
-    if program_earnings is not None and unit_id is not None:
-        st.subheader("Program outcomes", anchor=False)
-        school_earn = program_earnings[program_earnings["unit_id"] == unit_id]
-        if not school_earn.empty:
+        c1, c2 = st.columns(2)
+        c1.markdown(f"**Grad rate:** {grad_str}")
+        c2.markdown(f"**International students:** {pct_str}")
+
+        flags = []
+        if row.get("has_transfer_track"):
+            flags.append("Transfer track (Liberal Arts, CIP 24.01)")
+        if row.get("offers_entrepreneurship"):
+            flags.append("Entrepreneurship program (CIP 52.07)")
+        if row.get("open_admission"):
+            flags.append("Open admission")
+        if flags:
+            st.markdown("**Programs & policies:** " + " · ".join(flags))
+
+        # Programs
+        assoc_progs = _program_list(row.get("associate_cips", ""), major_prefixes)
+        bach_progs  = _program_list(row.get("bachelor_cips",  ""), major_prefixes)
+
+        if assoc_progs or bach_progs:
+            st.subheader("Programs offered", anchor=False)
+            total_prog_count = len(assoc_progs) + len(bach_progs)
             if major_prefixes:
-                matched = school_earn[school_earn["cip4"].apply(
-                    lambda c: any(c.startswith(p) for p in major_prefixes)
-                )]
-                if matched.empty:
-                    st.caption("No earnings data for this major at this school.")
+                main_assoc = [(m, n) for m, n in assoc_progs if m]
+                main_bach  = [(m, n) for m, n in bach_progs  if m]
+                if not main_assoc and not main_bach:
+                    st.caption("No programs found for this major at this school.")
                 else:
-                    # Weighted median across matched programs
-                    total_earn = (matched["earn_mdn_4yr"] * matched["earn_n"]).sum()
-                    total_n = matched["earn_n"].sum()
-                    avg_earn = total_earn / total_n if total_n > 0 else float("nan")
+                    if main_assoc:
+                        st.markdown("**Associate's degrees**")
+                        for _, pname in main_assoc:
+                            st.markdown(f"&nbsp;&nbsp;★ {pname}", unsafe_allow_html=True)
+                    if main_bach:
+                        st.markdown("**Bachelor's degrees**")
+                        for _, pname in main_bach:
+                            st.markdown(f"&nbsp;&nbsp;★ {pname}", unsafe_allow_html=True)
+                    st.caption("★ = matches your selected major")
+            else:
+                combined = assoc_progs + bach_progs
+                for _, pname in combined[:8]:
+                    st.markdown(f"&nbsp;&nbsp;· {pname}", unsafe_allow_html=True)
+            with st.expander(f"See all {total_prog_count} programs"):
+                if assoc_progs:
+                    st.markdown("**Associate's degrees**")
+                    for is_match, pname in assoc_progs:
+                        prefix = "★ " if is_match else "· "
+                        st.markdown(f"&nbsp;&nbsp;{prefix}{pname}", unsafe_allow_html=True)
+                if bach_progs:
+                    st.markdown("**Bachelor's degrees**")
+                    for is_match, pname in bach_progs:
+                        prefix = "★ " if is_match else "· "
+                        st.markdown(f"&nbsp;&nbsp;{prefix}{pname}", unsafe_allow_html=True)
+                if major_prefixes:
+                    st.caption("★ = matches your selected major")
+        else:
+            st.caption("No program data available in the College Scorecard for this school.")
+
+        # Admissions
+        st.subheader("Admissions", anchor=False)
+        admit = row.get("admit_rate")
+        tier = row.get("selectivity_tier") or selectivity_tier(admit)
+        tier_color = {"Reach": "red", "Target": "orange", "Likely": "green"}.get(tier, "gray")
+        admit_str = f"{admit:.0%}" if pd.notna(admit) else "—"
+        st.markdown(f"**Selectivity:** :{tier_color}-badge[{tier}]  ·  Admit rate: {admit_str}")
+        st.caption(
+            "Selectivity is based on admit rate only; it doesn't know the student's grades."
+        )
+        test_raw = row.get("test_policy")
+        if pd.notna(test_raw):
+            try:
+                test_label = ADMCON7_LABELS.get(int(test_raw), f"Code {int(test_raw)}")
+            except (TypeError, ValueError):
+                test_label = str(test_raw)
+            st.markdown(f"**Test score policy:** {test_label}")
+        r25 = row.get("sat_read_25")
+        r75 = row.get("sat_read_75")
+        m25 = row.get("sat_math_25")
+        m75 = row.get("sat_math_75")
+        sat_parts = []
+        if pd.notna(r25) and pd.notna(r75):
+            sat_parts.append(f"Reading: {int(r25)}–{int(r75)}")
+        if pd.notna(m25) and pd.notna(m75):
+            sat_parts.append(f"Math: {int(m25)}–{int(m75)}")
+        if sat_parts:
+            st.markdown("**SAT 25th–75th percentile:** " + "  ·  ".join(sat_parts))
+        if row.get("ivy_league") or (unit_id in IVY_UNIT_IDS):
+            st.info(
+                "No athletic scholarships; financial aid is need-based only.",
+                icon="🏛️",
+            )
+
+        # Program outcomes
+        if program_earnings is not None and unit_id is not None:
+            st.subheader("Program outcomes", anchor=False)
+            school_earn = program_earnings[program_earnings["unit_id"] == unit_id]
+            if not school_earn.empty:
+                if major_prefixes:
+                    matched = school_earn[school_earn["cip4"].apply(
+                        lambda c: any(c.startswith(p) for p in major_prefixes)
+                    )]
+                    if matched.empty:
+                        st.caption("No earnings data for this major at this school.")
+                    else:
+                        total_earn = (matched["earn_mdn_4yr"] * matched["earn_n"]).sum()
+                        total_n = matched["earn_n"].sum()
+                        avg_earn = total_earn / total_n if total_n > 0 else float("nan")
+                        st.metric(
+                            "Graduates' median earnings 4 yrs after (this major)",
+                            f"${avg_earn:,.0f}" if pd.notna(avg_earn) else "—",
+                        )
+                        st.caption(
+                            "Earnings cover graduates who received U.S. federal aid; "
+                            "small programs are hidden for privacy."
+                        )
+                else:
+                    all_earn = school_earn["earn_mdn_4yr"].median()
                     st.metric(
-                        "Graduates' median earnings 4 yrs after (this major)",
-                        f"${avg_earn:,.0f}" if pd.notna(avg_earn) else "—",
+                        "Graduates' median earnings 4 yrs after (all programs)",
+                        f"${all_earn:,.0f}" if pd.notna(all_earn) else "—",
                     )
                     st.caption(
                         "Earnings cover graduates who received U.S. federal aid; "
                         "small programs are hidden for privacy."
                     )
-            else:
-                all_earn = school_earn["earn_mdn_4yr"].median()
-                st.metric(
-                    "Graduates' median earnings 4 yrs after (all programs)",
-                    f"${all_earn:,.0f}" if pd.notna(all_earn) else "—",
-                )
-                st.caption(
-                    "Earnings cover graduates who received U.S. federal aid; "
-                    "small programs are hidden for privacy."
-                )
 
-    # Website
-    website = row.get("website")
-    if pd.notna(website) and website:
-        st.link_button("Visit school website ↗", url=str(website))
+        # Website
+        website = row.get("website")
+        if pd.notna(website) and website:
+            st.link_button("Visit school website ↗", url=str(website))
+
+    # ── Notable alumni (full width, loaded from Wikidata) ────────────────────
+    if alumni_df is not None and unit_id is not None:
+        school_alum = alumni_df[alumni_df["unit_id"] == int(unit_id)].head(5)
+        if not school_alum.empty:
+            st.subheader("Notable alumni", anchor=False)
+            for _, alum in school_alum.iterrows():
+                alum_name = alum["name"] or "Unknown"
+                occ   = alum.get("occupation")
+                occ_s = f" · {occ}" if occ and str(occ) not in ("nan", "None", "") else ""
+                pt    = bool(alum.get("has_pt_wiki"))
+                pt_s  = " :blue-badge[Known in Brazil]" if pt else ""
+                url   = alum.get("en_wiki_url")
+                url_s = str(url) if url and str(url) not in ("nan", "None", "") else ""
+                if url_s:
+                    st.markdown(f"[{alum_name}]({url_s}){occ_s}{pt_s}")
+                else:
+                    st.markdown(f"**{alum_name}**{occ_s}{pt_s}")
+            st.caption(
+                "From Wikidata. Fame is measured by how many Wikipedia languages cover the person. "
+                "Coverage is uneven, and 'studied at' includes graduate and short-term study."
+            )
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -736,7 +781,7 @@ if has_aid_estimate.any() and not results.empty:
     results["est_net_cost"]       = results.index.map(df["est_net_cost"])
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_find, tab_how = st.tabs(["Find schools", "How it works"])
+tab_find, tab_alumni, tab_how = st.tabs(["Find schools", "Famous alumni", "How it works"])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — Find schools
@@ -916,6 +961,9 @@ with tab_find:
                             # Ivy League badge
                             if row.get("ivy_league") or row.get("unit_id") in IVY_UNIT_IDS:
                                 badges.append(("Ivy League", "violet"))
+                            # Notable alumni badge (≥20 Wikipedia languages)
+                            if int(row.get("unit_id") or 0) in _famous_school_ids:
+                                badges.append(("Notable alumni", "violet"))
                             st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
 
                             w1, w2 = split_reasons(row["top_reasons"])
@@ -1048,7 +1096,93 @@ with tab_find:
             )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — How it works
+# TAB 2 — Famous alumni
+# ══════════════════════════════════════════════════════════════════════════════
+with tab_alumni:
+    if alumni_df is None:
+        st.info(
+            "Alumni data not loaded. Run `python scripts/fetch_alumni.py` to fetch from Wikidata.",
+            icon="ℹ️",
+        )
+    elif results.empty:
+        st.info("No schools match the current filters.")
+    else:
+        only_brazil = st.toggle(
+            "Only people with a Portuguese Wikipedia article (known in Brazil)",
+            key="alumni_brazil_only",
+        )
+
+        result_unit_ids = results["unit_id"].dropna().astype(int).tolist()
+        school_alumni = alumni_df[alumni_df["unit_id"].isin(result_unit_ids)].copy()
+
+        if only_brazil:
+            school_alumni = school_alumni[school_alumni["has_pt_wiki"]]
+
+        if school_alumni.empty:
+            msg = "No alumni found for the current filtered schools."
+            if only_brazil:
+                msg += " Try turning off the Brazil filter."
+            st.info(msg)
+        else:
+            # Best alum per school by sitelinks
+            top_per_school = (
+                school_alumni.sort_values("sitelinks", ascending=False)
+                             .groupby("unit_id").first().reset_index()
+            )
+            # Join with match results for school name / state / type / score
+            school_meta = results[["name", "state", "school_type", "unit_id", "match_score"]].copy()
+            school_meta["unit_id"] = school_meta["unit_id"].fillna(-1).astype(int)
+            merged = school_meta.merge(top_per_school, on="unit_id", how="inner",
+                                       suffixes=("_school", "_alum"))
+
+            sort_key = st.selectbox(
+                "Sort by",
+                ["Most famous alum", "Best match", "School name"],
+                key="alumni_sort_sel",
+                label_visibility="collapsed",
+            )
+            if sort_key == "Most famous alum":
+                merged = merged.sort_values("sitelinks", ascending=False)
+            elif sort_key == "Best match":
+                merged = merged.sort_values("match_score", ascending=False)
+            else:
+                merged = merged.sort_values("name_school")
+
+            def _s(x) -> str:
+                return str(x) if x and str(x) not in ("nan", "None", "") else ""
+
+            records = []
+            for _, r in merged.iterrows():
+                alum_name = _s(r.get("name_alum"))
+                records.append({
+                    "School":              r["name_school"],
+                    "ST":                  r.get("state", ""),
+                    "Type":                r.get("school_type", ""),
+                    "Top alum":            alum_name,
+                    "Occupation":          _s(r.get("occupation")),
+                    "Wikipedia link":      _s(r.get("en_wiki_url")) or None,
+                    "Wikipedia languages": int(r.get("sitelinks") or 0),
+                    "Known in Brazil":     "✓" if r.get("has_pt_wiki") else "",
+                })
+            display = pd.DataFrame(records)
+            st.dataframe(
+                display,
+                column_config={
+                    "Wikipedia link": st.column_config.LinkColumn("Wikipedia"),
+                    "Wikipedia languages": st.column_config.NumberColumn(
+                        "Wikipedia languages", format="%d"
+                    ),
+                },
+                use_container_width=True, hide_index=True,
+            )
+            st.caption(
+                f"{len(display)} schools shown. "
+                "Fame = number of Wikipedia language editions covering the person. "
+                "Source: Wikidata (P69 educated at, P1771 IPEDS ID)."
+            )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — How it works
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_how:
 
@@ -1143,6 +1277,17 @@ the cost is lower, or the environment is a better fit.
             "Coverage is limited — only schools in our database with a filed CDS are included."
         )
         st.link_button("commondataset.org ↗", "https://www.commondataset.org")
+
+        st.markdown("**Wikidata — Notable alumni**")
+        st.markdown(
+            "Alumni linked to each school via IPEDS ID (property P1771) and the "
+            "'educated at' property (P69). "
+            "Fame is measured by the number of Wikipedia language editions that cover the person. "
+            "**Caveats:** coverage is uneven across schools; P69 includes graduate, "
+            "exchange, and short-term study; a highly famous person skews perception of an "
+            "otherwise less-prominent school."
+        )
+        st.link_button("wikidata.org ↗", "https://www.wikidata.org")
 
     # ── Limitations ───────────────────────────────────────────────────────────
     st.header("What this tool can't tell you", anchor=False)
