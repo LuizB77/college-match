@@ -474,6 +474,44 @@ def test_zero_weights_no_crash(_apptest_cls):
     assert not at.exception, f"App crashed with all-zero weights: {at.exception}"
 
 
+def test_card_titles_in_rank_order(_apptest_cls):
+    """Card titles must appear in rank order (#1 before #2 ...) so row-by-row layout is correct."""
+    import re
+    at = _fresh_at(_apptest_cls).run()
+    assert not at.exception, f"App crashed: {at.exception}"
+    card_titles = [m.value for m in at.markdown if re.match(r"\*\*#\d+", m.value or "")]
+    ranks = [int(re.search(r"#(\d+)", t).group(1)) for t in card_titles if re.search(r"#(\d+)", t)]
+    assert len(ranks) >= 3, f"Expected at least 3 card titles, got {ranks}"
+    assert ranks == sorted(ranks), f"Cards not in rank order: {ranks}"
+
+
+def test_explain_exclusion_no_bare_dollars(df):
+    """Cost reason from explain_exclusion must use \\$ (not bare $) so markdown is safe."""
+    import re
+    client = {
+        "name": "dollar-test",
+        "require_f1": False, "max_budget": 5_000, "budget_flex": 1.0,
+        "school_types": ["2-year", "4-year"], "states": None, "city_groups": None,
+        "sport": None, "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": None, "strict_major": False, "religion": None,
+        "hidden_gems_only": False,
+        "weights": {"low_cost": 1, "grad_rate": 0, "sport_culture": 0,
+                    "athlete_opportunity": 0, "international_community": 0,
+                    "open_admission": 0, "small_school": 0, "entrepreneurship_program": 0},
+    }
+    over = df[df["cost_international"] > 5_000].head(10)
+    found_cost_reason = False
+    for _, row in over.iterrows():
+        reasons = explain_exclusion(row, client)
+        for r in reasons:
+            if "cost" in r.lower() or "budget" in r.lower():
+                found_cost_reason = True
+                bare = re.findall(r"(?<!\\)\$", r)
+                assert not bare, f"Bare $ in cost reason (LaTeX risk in markdown): {r!r}"
+    assert found_cost_reason, "Expected at least one cost reason across sampled rows"
+
+
 def test_clear_all(_apptest_cls):
     """After changing filters and clicking 'Clear all filters', count returns to 3147."""
     at = _fresh_at(_apptest_cls)

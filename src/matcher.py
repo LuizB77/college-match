@@ -365,8 +365,8 @@ def explain_exclusion(
         limit = max_budget * client.get("budget_flex", 1.0)
         cost = row.get("cost_international")
         if pd.isna(cost) or cost > limit:
-            cost_str = f"${cost:,.0f}" if pd.notna(cost) else "unknown"
-            reasons.append(f"Cost {cost_str} is over the ${limit:,.0f} budget")
+            cost_str = f"\\${cost:,.0f}" if pd.notna(cost) else "unknown"
+            reasons.append(f"Cost {cost_str} is over the \\${limit:,.0f} budget")
 
     if client.get("sport"):
         col = "mens_sports" if client.get("gender") == "men" else "womens_sports"
