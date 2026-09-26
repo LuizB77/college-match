@@ -163,6 +163,7 @@ def match(
     client: dict,
     top_n: int | None = None,
     program_earnings: pd.DataFrame | None = None,
+    alumni_df: pd.DataFrame | None = None,
 ):
     """
     Apply hard filters then rank by weighted score (verbatim from notebook 04 cell 3).
@@ -259,10 +260,25 @@ def match(
         funnel.append((f"After offers major {prefixes}", len(c)))
 
     if client.get("hidden_gems_only"):
-        # Pre-compute program_strength percentile on the filtered pool to apply threshold
         _pg_strength = _program_strength_percentiles(c, client.get("majors"), program_earnings)
-        _selectivity = c["selectivity_tier"] if "selectivity_tier" in c.columns else c["admit_rate"].apply(selectivity_tier)
-        mask = (_pg_strength >= 0.75) & (_selectivity != "Reach")
+
+        # Admit rate >= 30% or open admission (stored as 0)
+        def _admit_ok(row):
+            ar = row.get("admit_rate")
+            if pd.isna(ar):
+                return True   # no data → give benefit of doubt
+            return float(ar) == 0.0 or float(ar) >= 0.30
+
+        admit_mask = c.apply(_admit_ok, axis=1)
+
+        # Famous alumni: max sitelinks for the school must be < 60
+        alum_mask = pd.Series(True, index=c.index)
+        if alumni_df is not None and not alumni_df.empty:
+            max_links = alumni_df.groupby("unit_id")["sitelinks"].max()
+            c_links   = c["unit_id"].map(max_links).fillna(0)
+            alum_mask = c_links < 60
+
+        mask = (_pg_strength >= 0.75) & admit_mask & alum_mask
         c = c[mask]
         funnel.append(("After hidden gems filter", len(c)))
 
@@ -306,6 +322,7 @@ def explain_exclusion(
     client: dict,
     program_earnings: pd.DataFrame | None = None,
     full_df: pd.DataFrame | None = None,
+    alumni_df: pd.DataFrame | None = None,
 ) -> list[str]:
     """
     Return a list of plain-English reasons why *row* fails the hard filters in *client*.
@@ -413,12 +430,28 @@ def explain_exclusion(
 
     if client.get("hidden_gems_only"):
         admit = row.get("admit_rate")
-        tier = row.get("selectivity_tier") or selectivity_tier(admit)
-        if tier == "Reach":
-            rate_str = f"{admit:.0%}" if pd.notna(admit) else "unknown"
-            reasons.append(f"Highly selective (admit rate {rate_str})")
-        elif full_df is not None:
-            # Compute program_strength percentile for this row against the full pool
+
+        # Admit rate must be >= 30% (or open admission stored as 0)
+        if pd.notna(admit) and float(admit) != 0.0 and float(admit) < 0.30:
+            rate_str = f"{admit:.0%}"
+            reasons.append(f"Admit rate {rate_str} is below 30%")
+
+        # Famous alumni: most-famous alum must have < 60 Wikipedia sitelinks
+        if alumni_df is not None and row.get("unit_id") is not None:
+            try:
+                unit = int(row["unit_id"])
+            except (TypeError, ValueError):
+                unit = None
+            if unit is not None:
+                school_alums = alumni_df[alumni_df["unit_id"] == unit]
+                if not school_alums.empty:
+                    top_alum = school_alums.nlargest(1, "sitelinks").iloc[0]
+                    if int(top_alum["sitelinks"]) >= 60:
+                        alum_name = str(top_alum.get("name", "a famous alumnus"))
+                        reasons.append(f"Too well known: alumni include {alum_name}")
+
+        # Program strength must be in the top 25%
+        if full_df is not None:
             ps_series = _program_strength_percentiles(full_df, client.get("majors"), program_earnings)
             ps_val = ps_series.get(row.name, 0.5)
             if ps_val < 0.75:

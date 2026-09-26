@@ -376,8 +376,14 @@ def test_program_strength_in_match(df, program_earnings):
 
 
 def test_hidden_gems_only(df, program_earnings):
-    """hidden_gems_only filter must keep only non-Reach schools with high program strength."""
+    """hidden_gems_only filter: admit_rate >= 30%, no famous alum >= 60 sitelinks, top-25% outcomes."""
     assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
+
+    alumni_path = ROOT / "data/processed/notable_alumni.csv"
+    alumni_df = None
+    if alumni_path.exists():
+        alumni_df = pd.read_csv(alumni_path, dtype={"unit_id": int, "sitelinks": int})
+
     client_no_gems = {
         "name": "no-gems",
         "require_f1": False, "max_budget": None, "budget_flex": 1.5,
@@ -393,14 +399,32 @@ def test_hidden_gems_only(df, program_earnings):
     }
     client_gems = {**client_no_gems, "hidden_gems_only": True}
     results_all, _ = match(df, client_no_gems, program_earnings=program_earnings)
-    results_gems, funnel = match(df, client_gems, program_earnings=program_earnings)
-    # Hidden gems must be a strict subset
+    results_gems, funnel = match(df, client_gems, program_earnings=program_earnings, alumni_df=alumni_df)
+
     assert len(results_gems) < len(results_all), "Hidden gems filter must reduce school count"
-    # No Reach schools in hidden gems
-    if "selectivity_tier" in results_gems.columns:
-        reach_in_gems = (results_gems["selectivity_tier"] == "Reach").sum()
-        assert reach_in_gems == 0, f"Hidden gems must not include Reach schools, found {reach_in_gems}"
-    # Funnel must show the hidden gems step
+
+    # No school with admit_rate < 30% (unless open admission == 0)
+    if "admit_rate" in results_gems.columns:
+        too_selective = results_gems[
+            results_gems["admit_rate"].notna() &
+            (results_gems["admit_rate"] != 0.0) &
+            (results_gems["admit_rate"] < 0.30)
+        ]
+        assert len(too_selective) == 0, (
+            f"Hidden gems must not include schools with admit_rate < 30%: "
+            f"{too_selective['name'].tolist()}"
+        )
+
+    # No school with a famous alum >= 60 sitelinks (when alumni_df available)
+    if alumni_df is not None and not results_gems.empty:
+        max_links = alumni_df.groupby("unit_id")["sitelinks"].max()
+        gem_links = results_gems["unit_id"].map(max_links).fillna(0)
+        too_famous = results_gems[gem_links >= 60]
+        assert len(too_famous) == 0, (
+            f"Hidden gems must not include schools with famous alum >= 60 sitelinks: "
+            f"{too_famous['name'].tolist()}"
+        )
+
     steps = [step for step, _ in funnel]
     assert any("hidden gem" in s.lower() for s in steps), f"Expected hidden gems step in funnel: {steps}"
 

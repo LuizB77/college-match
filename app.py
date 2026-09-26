@@ -304,9 +304,10 @@ opps_df          = get_opportunities(str(OPPS_PATH))
 contacts_df      = get_contacts(str(CONTACTS_PATH))
 
 def _opp_visible(df_o: pd.DataFrame) -> pd.DataFrame:
-    """Rows shown in the app: auto-checked or human-verified."""
+    """Rows shown in the app: auto-checked, blocked, or human-verified."""
     return df_o[
         (df_o["check_status"] == "auto-checked") |
+        (df_o["check_status"] == "blocked") |
         (df_o["verified"] == "yes")
     ]
 
@@ -696,6 +697,8 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
                     url_o = str(opp.get("url", "")).strip()
                     if url_o and url_o not in ("nan", "None", ""):
                         line = f"[{line}]({url_o})"
+                    if str(opp.get("check_status", "")).strip() == "blocked":
+                        line += "  :gray-badge[Couldn't auto-check; open the link to confirm]"
                     st.markdown(f"&nbsp;&nbsp;{line}", unsafe_allow_html=True)
             st.caption(
                 "Hand-collected from official school pages. Each entry links to its source. "
@@ -823,8 +826,9 @@ with st.sidebar:
         "Hidden gems only",
         key="sb_hidden_gems",
         help=(
-            "Schools with top-quarter graduate outcomes that aren't ultra-selective, "
-            "often great schools families abroad haven't heard of."
+            "Schools with top-quarter graduate outcomes, an admit rate ≥ 30%, "
+            "and no widely-famous alumni (< 60 Wikipedia languages). "
+            "Often excellent schools that families abroad haven't heard of."
         ),
     )
 
@@ -909,7 +913,7 @@ else:
     df_for_match = df
 
 # ── Run matcher ────────────────────────────────────────────────────────────────
-results, funnel = match(df_for_match, client, program_earnings=program_earnings)
+results, funnel = match(df_for_match, client, program_earnings=program_earnings, alumni_df=alumni_df)
 
 # Restore original sticker cost for display; keep est_net_cost alongside.
 if has_aid_estimate.any() and not results.empty:
@@ -983,7 +987,8 @@ with tab_find:
         row_idx = school_label_to_idx[lookup_label]
         lookup_row = df_for_match.loc[row_idx]
         lookup_row_display = df.loc[row_idx]
-        reasons = explain_exclusion(lookup_row, client)
+        reasons = explain_exclusion(lookup_row, client, program_earnings=program_earnings,
+                                    full_df=df_for_match, alumni_df=alumni_df)
 
         with st.container(border=True):
             if not reasons:
@@ -1371,14 +1376,18 @@ mostly because of a preference you don't actually care about, lower that weight 
     st.header("Hidden gems filter", anchor=False)
     st.markdown(
         """
-**What counts as a hidden gem?** A school where:
+**What counts as a hidden gem?** A school must pass all three:
 1. Graduates in your chosen major (or all graduates, if no major is chosen) earn in the
-   **top 25% across all schools** that offer that major — and
-2. The school is **not ultra-selective** (admit rate ≥ 15%).
+   **top 25% across all schools** that offer that major.
+2. **Admit rate ≥ 30%** (or open admission) — highly selective schools already have strong
+   brand recognition and aren't hidden.
+3. **No widely-famous alumni** — the school's most-famous alum (by Wikipedia language coverage)
+   has fewer than 60 Wikipedia editions. Schools with a globally recognized alumnus are already
+   well-known abroad.
 
-The idea: selective schools already have strong brand recognition. Hidden gems are less-known schools
-where the data shows graduates do as well or better — often because the programs are excellent,
-the cost is lower, or the environment is a better fit.
+The idea: this finds schools where outcomes are excellent but brand recognition is low —
+often because the program is niche, the school is regional, or it simply hasn't been
+marketed internationally.
 
 **Caveats:**
 - Earnings are not the same as quality. Selective schools admit students who'd earn well anywhere;
@@ -1387,6 +1396,7 @@ the cost is lower, or the environment is a better fit.
   school in rural Alabama simply because Bay Area salaries are higher.
 - Earnings data covers graduates who received U.S. federal aid. International students and
   students at very small programs may not be represented.
+- Alumni fame is measured by Wikidata coverage, which is uneven across countries and disciplines.
         """
     )
 
