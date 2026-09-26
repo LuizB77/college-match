@@ -36,7 +36,8 @@ CIP_PATH      = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
 AID_PATH      = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
 EARN_PATH     = Path(__file__).parent / "data" / "processed" / "program_earnings.csv"
 ALUMNI_PATH   = Path(__file__).parent / "data" / "processed" / "notable_alumni.csv"
-OPPS_PATH     = Path(__file__).parent / "data" / "manual"    / "opportunities.csv"
+OPPS_PATH      = Path(__file__).parent / "data" / "manual"    / "opportunities.csv"
+CONTACTS_PATH  = Path(__file__).parent / "data" / "manual"    / "intl_contacts.csv"
 
 MAJOR_OPTIONS = {
     "None":               None,
@@ -245,10 +246,23 @@ def get_opportunities(path_str: str):
     if not p.exists():
         return None
     o = pd.read_csv(p, dtype={"unit_id": int})
-    o["intl_eligible"] = o["intl_eligible"].fillna("unknown").str.strip().str.lower()
-    o["verified"]      = o["verified"].fillna("no").str.strip().str.lower()
-    o["amount"]        = o["amount"].fillna("").astype(str)
+    o["intl_eligible"]  = o["intl_eligible"].fillna("unknown").str.strip().str.lower()
+    o["verified"]       = o["verified"].fillna("no").str.strip().str.lower()
+    o["check_status"]   = o["check_status"].fillna("failed").str.strip().str.lower() if "check_status" in o.columns else "failed"
+    o["amount"]         = o["amount"].fillna("").astype(str)
     return o
+
+
+@st.cache_data
+def get_contacts(path_str: str):
+    p = Path(path_str)
+    if not p.exists():
+        return None
+    c = pd.read_csv(p, dtype={"unit_id": int})
+    for col in ("office_email", "office_phone"):
+        if col in c.columns:
+            c[col] = c[col].fillna("").astype(str).str.strip()
+    return c
 
 
 @st.cache_data
@@ -287,17 +301,25 @@ intl_aid         = get_intl_aid()
 program_earnings = get_program_earnings(str(EARN_PATH))
 alumni_df        = get_alumni(str(ALUMNI_PATH))
 opps_df          = get_opportunities(str(OPPS_PATH))
+contacts_df      = get_contacts(str(CONTACTS_PATH))
 
-# Precompute opportunity sets for badge + filter lookups
-_opp_merit_ids: set = (
-    set(opps_df[(opps_df["type"] == "merit_scholarship") &
-                (opps_df["intl_eligible"] == "yes")]["unit_id"].unique())
-    if opps_df is not None else set()
-)
-_opp_comp_ids: set = (
-    set(opps_df[opps_df["type"] == "competition"]["unit_id"].unique())
-    if opps_df is not None else set()
-)
+def _opp_visible(df_o: pd.DataFrame) -> pd.DataFrame:
+    """Rows shown in the app: auto-checked or human-verified."""
+    return df_o[
+        (df_o["check_status"] == "auto-checked") |
+        (df_o["verified"] == "yes")
+    ]
+
+# Precompute opportunity sets for badge + filter lookups (visible rows only)
+if opps_df is not None:
+    _vis = _opp_visible(opps_df)
+    _opp_merit_ids: set = set(
+        _vis[(_vis["type"] == "merit_scholarship") & (_vis["intl_eligible"] == "yes")]["unit_id"].unique()
+    )
+    _opp_comp_ids: set = set(_vis[_vis["type"] == "competition"]["unit_id"].unique())
+else:
+    _opp_merit_ids: set = set()
+    _opp_comp_ids: set = set()
 
 # Precompute which unit_ids have a "famous" alum (≥20 Wikipedia languages)
 _famous_school_ids: set = (
@@ -641,16 +663,17 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
 
     # ── Opportunities (full width, hand-collected) ────────────────────────────
     if opps_df is not None and unit_id is not None:
-        school_opps = opps_df[opps_df["unit_id"] == int(unit_id)]
+        school_opps_all = opps_df[opps_df["unit_id"] == int(unit_id)]
+        school_opps = _opp_visible(school_opps_all) if not school_opps_all.empty else school_opps_all
         if not school_opps.empty:
             _TYPE_LABEL = {
-                "merit_scholarship":     "Merit Scholarship",
-                "athletic":              "Athletic Aid",
-                "need_based":            "Need-Based Aid",
-                "competition":           "Pitch Competition",
+                "merit_scholarship":       "Merit Scholarship",
+                "athletic":                "Athletic Aid",
+                "need_based":              "Need-Based Aid",
+                "competition":             "Pitch Competition",
                 "entrepreneurship_center": "Entrepreneurship Center",
-                "accelerator":           "Accelerator",
-                "other":                 "Other",
+                "accelerator":             "Accelerator",
+                "other":                   "Other",
             }
             st.subheader("Opportunities", anchor=False)
             for opp_type, group in school_opps.groupby("type"):
@@ -669,19 +692,45 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
                     desc = str(opp.get("description", "")).strip()
                     if desc and desc != "nan":
                         parts.append(desc)
-                    unverified = str(opp.get("verified", "no")).strip() != "yes"
                     line = "  ·  ".join(parts)
                     url_o = str(opp.get("url", "")).strip()
                     if url_o and url_o not in ("nan", "None", ""):
                         line = f"[{line}]({url_o})"
-                    if unverified:
-                        line += "  :gray-badge[Unverified]"
                     st.markdown(f"&nbsp;&nbsp;{line}", unsafe_allow_html=True)
             st.caption(
-                "Hand-collected from official school pages. "
-                "Each entry links to its source. "
-                "'Unverified' means a human hasn't re-confirmed the page recently."
+                "Hand-collected from official school pages. Each entry links to its source. "
+                "Confirm details with the international office."
             )
+
+    # ── Contact (international office) ───────────────────────────────────────
+    if unit_id is not None:
+        from urllib.parse import quote_plus
+        st.subheader("Contact", anchor=False)
+        contact_row = None
+        if contacts_df is not None:
+            match_rows = contacts_df[contacts_df["unit_id"] == int(unit_id)]
+            if not match_rows.empty:
+                contact_row = match_rows.iloc[0]
+
+        if contact_row is not None:
+            intl_url = str(contact_row.get("intl_admissions_url", "")).strip()
+            if intl_url and intl_url not in ("nan", "None", ""):
+                st.link_button("International admissions page", intl_url)
+            email = str(contact_row.get("office_email", "")).strip()
+            phone = str(contact_row.get("office_phone", "")).strip()
+            if email and email not in ("nan", "None", ""):
+                st.markdown(f"**Email:** {email}")
+            if phone and phone not in ("nan", "None", ""):
+                st.markdown(f"**Phone:** {phone}")
+            checked = str(contact_row.get("date_checked", "")).strip()
+            if checked and checked not in ("nan", "None", ""):
+                st.caption(f"Checked {checked}")
+        else:
+            school_name_raw = st.session_state.get("school_lookup", "")
+            school_name_q = school_name_raw.split(" (")[0].strip() if school_name_raw else ""
+            search_url = f"https://www.google.com/search?q={quote_plus(school_name_q + ' international admissions')}"
+            st.link_button("Find their international office", search_url)
+        st.caption("Ask the international office about scholarships, deadlines, and English test requirements.")
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────

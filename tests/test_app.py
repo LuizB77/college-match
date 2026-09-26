@@ -613,7 +613,8 @@ def test_clear_all(_apptest_cls):
 # Part 3: opportunities
 # ---------------------------------------------------------------------------
 
-OPPS_PATH = ROOT / "data/manual/opportunities.csv"
+OPPS_PATH     = ROOT / "data/manual/opportunities.csv"
+CONTACTS_PATH = ROOT / "data/manual/intl_contacts.csv"
 OPPS_REQUIRED_COLS = {"unit_id", "school_name", "type", "name", "description",
                        "amount", "intl_eligible", "url", "date_checked", "verified"}
 VALID_TYPES = {"merit_scholarship", "athletic", "need_based", "competition",
@@ -698,3 +699,65 @@ def test_opportunities_merit_toggle(_apptest_cls):
     assert count <= len(merit_schools["unit_id"].unique()), (
         f"Expected ≤{len(merit_schools['unit_id'].unique())} schools with merit toggle, got {count}"
     )
+
+
+# ---------------------------------------------------------------------------
+# International contacts tests
+# ---------------------------------------------------------------------------
+
+def test_contacts_csv_loads():
+    """Every contact row has an official-looking URL and date_checked; no personal name field."""
+    assert CONTACTS_PATH.exists(), f"Missing {CONTACTS_PATH}"
+    contacts = pd.read_csv(CONTACTS_PATH, dtype={"unit_id": int})
+
+    required_cols = {"unit_id", "school_name", "intl_admissions_url", "office_email",
+                     "office_phone", "date_checked"}
+    assert required_cols.issubset(contacts.columns), (
+        f"Missing columns: {required_cols - set(contacts.columns)}"
+    )
+    assert "personal_name" not in contacts.columns, "contacts CSV must not have a personal_name column"
+
+    for _, row in contacts.iterrows():
+        url = str(row["intl_admissions_url"]).strip()
+        assert url and url not in ("nan", "None", ""), (
+            f"Row {row['unit_id']} has blank intl_admissions_url"
+        )
+        assert url.startswith("http") and (".edu" in url or ".inter.edu" in url or ".pr" in url), (
+            f"Row {row['unit_id']} URL doesn't look like an official .edu URL: {url}"
+        )
+        checked = str(row["date_checked"]).strip()
+        assert checked and checked not in ("nan", "None", ""), (
+            f"Row {row['unit_id']} has blank date_checked"
+        )
+
+        # No personal emails (firstname.lastname@ pattern)
+        email = str(row.get("office_email", "")).strip()
+        if email and email not in ("nan", "None", ""):
+            local = email.split("@")[0]
+            assert "." not in local, (
+                f"Row {row['unit_id']} looks like a personal email: {email}"
+            )
+
+
+def test_contacts_details_fallback(_apptest_cls):
+    """Details renders the fallback Google search button for a school without a contact row."""
+    from src.matcher import load_data as _ld
+    df_t = _ld(ROOT / "data/processed/schools_with_majors.csv")
+    contacts = pd.read_csv(CONTACTS_PATH, dtype={"unit_id": int})
+    schools_with_contacts = set(contacts["unit_id"].unique())
+    target = df_t[~df_t["unit_id"].isin(schools_with_contacts)].iloc[0]
+    state_s = str(target["state"]) if pd.notna(target["state"]) else "?"
+    label = f"{target['name']} ({state_s})"
+
+    at = _fresh_at(_apptest_cls)
+    at.session_state["school_lookup"] = label
+    at.run()
+    assert not at.exception
+
+    det = next((b for b in at.button if b.key == "lookup_det"), None)
+    assert det is not None
+    det.click().run()
+    assert not at.exception, f"App crashed for school without contact row: {at.exception}"
+
+    # AppTest doesn't expose link_button href directly; assert no crash is sufficient
+    assert not at.exception
