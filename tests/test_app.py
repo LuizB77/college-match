@@ -474,6 +474,80 @@ def test_zero_weights_no_crash(_apptest_cls):
     assert not at.exception, f"App crashed with all-zero weights: {at.exception}"
 
 
+# ---------------------------------------------------------------------------
+# Part 2: notable alumni
+# ---------------------------------------------------------------------------
+
+ALUMNI_PATH = ROOT / "data/processed/notable_alumni.csv"
+
+
+def test_alumni_csv_exists_and_tracked():
+    """notable_alumni.csv must exist and be committed to git."""
+    import subprocess
+    tracked = set(
+        subprocess.check_output(["git", "ls-files"], cwd=ROOT).decode().splitlines()
+    )
+    assert "data/processed/notable_alumni.csv" in tracked, (
+        "notable_alumni.csv not tracked by git. "
+        "Run scripts/fetch_alumni.py and git add the file."
+    )
+    alumni = pd.read_csv(ALUMNI_PATH)
+    assert set(alumni.columns) >= {"unit_id", "wikidata_id", "name", "sitelinks", "has_pt_wiki"}
+    assert len(alumni) > 100, f"Expected >100 alumni rows, got {len(alumni)}"
+
+
+def test_alumni_tab_renders(_apptest_cls):
+    """Famous alumni tab renders without exception — Brazil toggle and sort box present."""
+    at = _fresh_at(_apptest_cls).run()
+    assert not at.exception, f"App crashed: {at.exception}"
+    brazil = next((t for t in at.toggle if "Brazil" in (t.label or "")), None)
+    sort   = next((s for s in at.selectbox if s.key == "alumni_sort_sel"), None)
+    assert brazil is not None, "Brazil toggle not found in Famous alumni tab"
+    assert sort   is not None, "Sort selectbox not found in Famous alumni tab"
+
+
+def test_alumni_details_with_alum(_apptest_cls):
+    """Details dialog renders for a school that has alumni data."""
+    alumni = pd.read_csv(ALUMNI_PATH)
+    schools_with = set(alumni["unit_id"].dropna().astype(int))
+    from src.matcher import load_data as _ld
+    df_t = _ld(ROOT / "data/processed/schools_with_majors.csv")
+    target = df_t[df_t["unit_id"].isin(schools_with)].iloc[0]
+    state_s = str(target["state"]) if pd.notna(target["state"]) else "?"
+    label = f"{target['name']} ({state_s})"
+
+    at = _fresh_at(_apptest_cls)
+    at.session_state["school_lookup"] = label
+    at.run()
+    assert not at.exception, f"App crashed on school lookup: {at.exception}"
+
+    det = next((b for b in at.button if b.key == "lookup_det"), None)
+    assert det is not None, "lookup_det button not found"
+    det.click().run()
+    assert not at.exception, f"App crashed opening details for school with alumni: {at.exception}"
+
+
+def test_alumni_details_without_alum(_apptest_cls):
+    """Details dialog renders for a school that has no alumni data."""
+    alumni = pd.read_csv(ALUMNI_PATH)
+    schools_with = set(alumni["unit_id"].dropna().astype(int))
+    from src.matcher import load_data as _ld
+    df_t = _ld(ROOT / "data/processed/schools_with_majors.csv")
+    target = df_t[~df_t["unit_id"].isin(schools_with)].iloc[0]
+    state_s = str(target["state"]) if pd.notna(target["state"]) else "?"
+    label = f"{target['name']} ({state_s})"
+
+    at = _fresh_at(_apptest_cls)
+    at.session_state["school_lookup"] = label
+    at.run()
+    assert not at.exception, f"App crashed on school lookup: {at.exception}"
+
+    det = next((b for b in at.button if b.key == "lookup_det"), None)
+    assert det is not None, "lookup_det button not found"
+    det.click().run()
+    assert not at.exception, f"App crashed opening details for school without alumni: {at.exception}"
+
+
 def test_card_titles_in_rank_order(_apptest_cls):
     """Card titles must appear in rank order (#1 before #2 ...) so row-by-row layout is correct."""
     import re
