@@ -36,6 +36,7 @@ CIP_PATH      = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
 AID_PATH      = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
 EARN_PATH     = Path(__file__).parent / "data" / "processed" / "program_earnings.csv"
 ALUMNI_PATH   = Path(__file__).parent / "data" / "processed" / "notable_alumni.csv"
+OPPS_PATH     = Path(__file__).parent / "data" / "manual"    / "opportunities.csv"
 
 MAJOR_OPTIONS = {
     "None":               None,
@@ -215,6 +216,7 @@ DEFAULTS = {
     "sb_strict_major":  False,
     "sb_require_f1":    False,
     "sb_hidden_gems":   False,
+    "sb_intl_merit":    False,
     "preset_select":    "Balanced",
 }
 
@@ -235,6 +237,18 @@ def get_cip_lookup() -> dict:
 @st.cache_data
 def get_program_earnings(path_str: str):
     return load_program_earnings(path_str)
+
+
+@st.cache_data
+def get_opportunities(path_str: str):
+    p = Path(path_str)
+    if not p.exists():
+        return None
+    o = pd.read_csv(p, dtype={"unit_id": int})
+    o["intl_eligible"] = o["intl_eligible"].fillna("unknown").str.strip().str.lower()
+    o["verified"]      = o["verified"].fillna("no").str.strip().str.lower()
+    o["amount"]        = o["amount"].fillna("").astype(str)
+    return o
 
 
 @st.cache_data
@@ -272,6 +286,18 @@ cip_lookup       = get_cip_lookup()
 intl_aid         = get_intl_aid()
 program_earnings = get_program_earnings(str(EARN_PATH))
 alumni_df        = get_alumni(str(ALUMNI_PATH))
+opps_df          = get_opportunities(str(OPPS_PATH))
+
+# Precompute opportunity sets for badge + filter lookups
+_opp_merit_ids: set = (
+    set(opps_df[(opps_df["type"] == "merit_scholarship") &
+                (opps_df["intl_eligible"] == "yes")]["unit_id"].unique())
+    if opps_df is not None else set()
+)
+_opp_comp_ids: set = (
+    set(opps_df[opps_df["type"] == "competition"]["unit_id"].unique())
+    if opps_df is not None else set()
+)
 
 # Precompute which unit_ids have a "famous" alum (≥20 Wikipedia languages)
 _famous_school_ids: set = (
@@ -338,6 +364,15 @@ def money(x) -> str:
     if pd.isna(x):
         return "—"
     return f"\\${x:,.0f}"
+
+
+def _is_numeric(s: str) -> bool:
+    """Return True if the string can be parsed as a float."""
+    try:
+        float(s)
+        return True
+    except (ValueError, TypeError):
+        return False
 
 
 def _program_list(cips_str: str, major_prefixes):
@@ -604,6 +639,50 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
                 "Coverage is uneven, and 'studied at' includes graduate and short-term study."
             )
 
+    # ── Opportunities (full width, hand-collected) ────────────────────────────
+    if opps_df is not None and unit_id is not None:
+        school_opps = opps_df[opps_df["unit_id"] == int(unit_id)]
+        if not school_opps.empty:
+            _TYPE_LABEL = {
+                "merit_scholarship":     "Merit Scholarship",
+                "athletic":              "Athletic Aid",
+                "need_based":            "Need-Based Aid",
+                "competition":           "Pitch Competition",
+                "entrepreneurship_center": "Entrepreneurship Center",
+                "accelerator":           "Accelerator",
+                "other":                 "Other",
+            }
+            st.subheader("Opportunities", anchor=False)
+            for opp_type, group in school_opps.groupby("type"):
+                type_label = _TYPE_LABEL.get(opp_type, opp_type.replace("_", " ").title())
+                st.markdown(f"**{type_label}**")
+                for _, opp in group.iterrows():
+                    parts = [f"**{opp['name']}**"]
+                    amt = str(opp.get("amount", "")).strip()
+                    if amt and amt != "nan":
+                        parts.append(money(float(amt)) if _is_numeric(amt) else amt)
+                    elig = str(opp.get("intl_eligible", "unknown")).strip()
+                    elig_str = {"yes": "✓ Open to international students",
+                                "no":  "✗ Not open to international students"}.get(
+                                    elig, "International eligibility: unknown")
+                    parts.append(elig_str)
+                    desc = str(opp.get("description", "")).strip()
+                    if desc and desc != "nan":
+                        parts.append(desc)
+                    unverified = str(opp.get("verified", "no")).strip() != "yes"
+                    line = "  ·  ".join(parts)
+                    url_o = str(opp.get("url", "")).strip()
+                    if url_o and url_o not in ("nan", "None", ""):
+                        line = f"[{line}]({url_o})"
+                    if unverified:
+                        line += "  :gray-badge[Unverified]"
+                    st.markdown(f"&nbsp;&nbsp;{line}", unsafe_allow_html=True)
+            st.caption(
+                "Hand-collected from official school pages. "
+                "Each entry links to its source. "
+                "'Unverified' means a human hasn't re-confirmed the page recently."
+            )
+
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -700,6 +779,15 @@ with st.sidebar:
         ),
     )
 
+    require_intl_merit = st.toggle(
+        "Has international merit scholarships",
+        key="sb_intl_merit",
+        help=(
+            "Only schools we've researched so far with a confirmed merit scholarship "
+            "open to international students. Schools with no research data are excluded."
+        ),
+    )
+
     st.divider()
 
     st.header("What matters most")
@@ -780,6 +868,13 @@ if has_aid_estimate.any() and not results.empty:
     results["cost_international"] = results.index.map(df["cost_international"])
     results["est_net_cost"]       = results.index.map(df["est_net_cost"])
 
+# Post-match filter: international merit scholarship (manual data)
+if require_intl_merit and not results.empty:
+    if opps_df is not None:
+        results = results[results["unit_id"].fillna(-1).astype(int).isin(_opp_merit_ids)]
+    else:
+        st.warning("Opportunities data not loaded — merit scholarship filter has no effect.")
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_find, tab_alumni, tab_how = st.tabs(["Find schools", "Famous alumni", "How it works"])
 
@@ -795,8 +890,8 @@ with tab_find:
     )
     st.caption("Set filters with ›› at the top left of the page.")
 
-    # "Schools that fit" = last funnel step (all schools passing every hard filter)
-    schools_that_fit = funnel[-1][1] if funnel else 0
+    # "Schools that fit" = ranked results after all filters (including post-match)
+    schools_that_fit = len(results)
 
     mrow1 = st.columns(2)
     mrow2 = st.columns(2)
@@ -964,6 +1059,12 @@ with tab_find:
                             # Notable alumni badge (≥20 Wikipedia languages)
                             if int(row.get("unit_id") or 0) in _famous_school_ids:
                                 badges.append(("Notable alumni", "violet"))
+                            # Opportunities badges
+                            _uid_int = int(row.get("unit_id") or 0)
+                            if _uid_int in _opp_merit_ids:
+                                badges.append(("Intl merit scholarship", "green"))
+                            if _uid_int in _opp_comp_ids:
+                                badges.append(("Pitch competitions", "orange"))
                             st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
 
                             w1, w2 = split_reasons(row["top_reasons"])
@@ -1288,6 +1389,15 @@ the cost is lower, or the environment is a better fit.
             "otherwise less-prominent school."
         )
         st.link_button("wikidata.org ↗", "https://www.wikidata.org")
+
+        st.markdown("**Opportunities (scholarships & competitions)**")
+        st.markdown(
+            "Hand-collected from official school pages (.edu). "
+            "Each entry includes the source URL and the date it was last checked. "
+            "**Coverage is incomplete** — only researched schools appear; "
+            "absence of an entry means we haven't looked, not that no scholarship exists. "
+            "'Unverified' means the entry was added automatically and hasn't been re-confirmed by a human."
+        )
 
     # ── Limitations ───────────────────────────────────────────────────────────
     st.header("What this tool can't tell you", anchor=False)

@@ -607,3 +607,94 @@ def test_clear_all(_apptest_cls):
     assert after is not None
     after_count = int(after.value.replace(",", ""))
     assert after_count == 3147, f"Expected 3147 after clear, got {after_count}"
+
+
+# ---------------------------------------------------------------------------
+# Part 3: opportunities
+# ---------------------------------------------------------------------------
+
+OPPS_PATH = ROOT / "data/manual/opportunities.csv"
+OPPS_REQUIRED_COLS = {"unit_id", "school_name", "type", "name", "description",
+                       "amount", "intl_eligible", "url", "date_checked", "verified"}
+VALID_TYPES = {"merit_scholarship", "athletic", "need_based", "competition",
+               "entrepreneurship_center", "accelerator", "other"}
+
+
+def test_opportunities_csv_loads():
+    """opportunities.csv must exist, have the required columns, and every row must
+    have a url and a date_checked value."""
+    assert OPPS_PATH.exists(), f"opportunities.csv not found at {OPPS_PATH}"
+    opps = pd.read_csv(OPPS_PATH, dtype={"unit_id": int})
+    missing_cols = OPPS_REQUIRED_COLS - set(opps.columns)
+    assert not missing_cols, f"Missing columns: {missing_cols}"
+    assert len(opps) >= 1, "Expected at least 1 row (the example row)"
+    bad_url = opps[opps["url"].isna() | (opps["url"].astype(str).str.strip() == "")]
+    assert bad_url.empty, f"Rows missing url:\n{bad_url[['unit_id','name']]}"
+    bad_date = opps[opps["date_checked"].isna() | (opps["date_checked"].astype(str).str.strip() == "")]
+    assert bad_date.empty, f"Rows missing date_checked:\n{bad_date[['unit_id','name']]}"
+    bad_type = opps[~opps["type"].isin(VALID_TYPES)]
+    assert bad_type.empty, f"Invalid type values:\n{bad_type[['unit_id','name','type']]}"
+
+
+def test_opportunities_details_with_opps(_apptest_cls):
+    """Details renders for a school that has opportunities data (Washburn, uid=156082)."""
+    from src.matcher import load_data as _ld
+    df_t = _ld(ROOT / "data/processed/schools_with_majors.csv")
+    opps = pd.read_csv(OPPS_PATH, dtype={"unit_id": int})
+    schools_with_opps = set(opps["unit_id"].unique())
+    # Find one of our schools that has an opps row
+    target = df_t[df_t["unit_id"].isin(schools_with_opps)].iloc[0]
+    state_s = str(target["state"]) if pd.notna(target["state"]) else "?"
+    label = f"{target['name']} ({state_s})"
+
+    at = _fresh_at(_apptest_cls)
+    at.session_state["school_lookup"] = label
+    at.run()
+    assert not at.exception, f"App crashed on school lookup: {at.exception}"
+
+    det = next((b for b in at.button if b.key == "lookup_det"), None)
+    assert det is not None, "lookup_det button not found"
+    det.click().run()
+    assert not at.exception, f"App crashed opening details for school with opps: {at.exception}"
+
+
+def test_opportunities_details_without_opps(_apptest_cls):
+    """Details renders for a school that has no opportunities data."""
+    from src.matcher import load_data as _ld
+    df_t = _ld(ROOT / "data/processed/schools_with_majors.csv")
+    opps = pd.read_csv(OPPS_PATH, dtype={"unit_id": int})
+    schools_with_opps = set(opps["unit_id"].unique())
+    target = df_t[~df_t["unit_id"].isin(schools_with_opps)].iloc[0]
+    state_s = str(target["state"]) if pd.notna(target["state"]) else "?"
+    label = f"{target['name']} ({state_s})"
+
+    at = _fresh_at(_apptest_cls)
+    at.session_state["school_lookup"] = label
+    at.run()
+    assert not at.exception
+
+    det = next((b for b in at.button if b.key == "lookup_det"), None)
+    assert det is not None
+    det.click().run()
+    assert not at.exception, f"App crashed for school without opps: {at.exception}"
+
+
+def test_opportunities_merit_toggle(_apptest_cls):
+    """Merit scholarship toggle reduces results to only researched schools with intl merit."""
+    opps = pd.read_csv(OPPS_PATH, dtype={"unit_id": int})
+    merit_schools = opps[(opps["type"] == "merit_scholarship") &
+                         (opps["intl_eligible"].str.lower() == "yes")]
+    if merit_schools.empty:
+        pytest.skip("No merit_scholarship + intl_eligible=yes rows in opportunities.csv yet")
+
+    at = _fresh_at(_apptest_cls)
+    at.session_state["sb_intl_merit"] = True
+    at.run()
+    assert not at.exception, f"App crashed with merit toggle on: {at.exception}"
+    metric = next((m for m in at.metric if "Schools that fit" in m.label), None)
+    assert metric is not None
+    count = int(metric.value.replace(",", ""))
+    # With the toggle, count must be ≤ number of schools with intl merit rows
+    assert count <= len(merit_schools["unit_id"].unique()), (
+        f"Expected ≤{len(merit_schools['unit_id'].unique())} schools with merit toggle, got {count}"
+    )
