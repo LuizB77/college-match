@@ -38,6 +38,37 @@ EARN_PATH     = Path(__file__).parent / "data" / "processed" / "program_earnings
 ALUMNI_PATH   = Path(__file__).parent / "data" / "processed" / "notable_alumni.csv"
 OPPS_PATH      = Path(__file__).parent / "data" / "manual"    / "opportunities.csv"
 CONTACTS_PATH  = Path(__file__).parent / "data" / "manual"    / "intl_contacts.csv"
+SEVP_RAW_DIR   = Path(__file__).parent / "data" / "raw" / "sevp"
+
+# ── Derive data-source dates from actual files ─────────────────────────────────
+import re as _re, subprocess as _sub
+
+def _sevp_list_date() -> str:
+    """Parse date from the SEVP PDF filename, e.g. 'certified-school-list-09-23-26.pdf'."""
+    pdfs = sorted(SEVP_RAW_DIR.glob("certified-school-list-*.pdf"))
+    if not pdfs:
+        return "unknown"
+    m = _re.search(r"(\d{2})-(\d{2})-(\d{2})", pdfs[-1].name)
+    if not m:
+        return "unknown"
+    mo, day, yr = m.groups()
+    return f"20{yr}-{mo}-{day}"
+
+def _git_file_date(rel_path: str) -> str:
+    """Return the date of the last git commit that touched rel_path."""
+    try:
+        out = _sub.check_output(
+            ["git", "log", "-1", "--format=%as", "--", rel_path],
+            cwd=Path(__file__).parent, stderr=_sub.DEVNULL,
+        ).decode().strip()
+        return out or "unknown"
+    except Exception:
+        return "unknown"
+
+_DATA_DATE_SCORECARD = "2022–23"
+_DATA_DATE_EADA      = "2024–25"
+_DATA_DATE_SEVP      = _sevp_list_date()
+_DATA_DATE_WIKIDATA  = _git_file_date("data/processed/notable_alumni.csv")
 
 MAJOR_OPTIONS = {
     "None":               None,
@@ -1091,6 +1122,9 @@ with tab_find:
                                 badges.append(("F-1 certified", "green"))
                             else:
                                 badges.append(("Not F-1 certified", "red"))
+                            row_affil = affil_label(row.get("religious_affil"))
+                            if row_affil:
+                                badges.append((row_affil, "gray"))
                             if row.get("offers_intl_aid") is True:
                                 badges.append(("Intl aid", "blue"))
                             elif row.get("athletic_aid_tier") in AID_TIERS:
@@ -1099,9 +1133,6 @@ with tab_find:
                                 badges.append(("Entrepreneurship", "orange"))
                             if row.get("school_type") == "2-year" and row.get("has_transfer_track"):
                                 badges.append(("Transfer track", "violet"))
-                            row_affil = affil_label(row.get("religious_affil"))
-                            if row_affil:
-                                badges.append((row_affil, "gray"))
                             # Selectivity badge (skip when admit rate is unknown)
                             tier = row.get("selectivity_tier") or selectivity_tier(row.get("admit_rate"))
                             if tier != "Unknown":
@@ -1402,6 +1433,13 @@ marketed internationally.
 
     # ── Where the data comes from ─────────────────────────────────────────────
     st.header("Where the data comes from", anchor=False)
+    st.caption(
+        f"**Data as of:** College Scorecard {_DATA_DATE_SCORECARD} · "
+        f"EADA {_DATA_DATE_EADA} · "
+        f"SEVP list {_DATA_DATE_SEVP} · "
+        f"Wikidata {_DATA_DATE_WIKIDATA}. "
+        "Schools can close or change policies; confirm with the international office."
+    )
     col_a, col_b = st.columns(2)
     with col_a:
         st.markdown("**College Scorecard**")

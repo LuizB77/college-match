@@ -106,6 +106,7 @@ def _program_strength_percentiles(
         return any(cip4.startswith(p) for p in major_prefixes)
 
     pe = program_earnings[program_earnings["cip4"].apply(_prefix_match)].copy()
+    pe = pe[pe["earn_n"] >= 20]   # drop programs with < 20 graduates; too few to be reliable
     if pe.empty:
         return result
 
