@@ -489,6 +489,17 @@ def test_online_only_wgu_included_when_toggled(df):
     )
 
 
+def test_online_only_never_sevp_certified(df):
+    """Invariant: no school can have both online_only=1 and sevp_certified=True."""
+    assert "online_only" in df.columns, "online_only column missing — re-run notebooks 01→05→06"
+    bad = df[(df["online_only"].fillna(0) == 1) & (df["sevp_certified"] == True)]
+    assert bad.empty, (
+        f"{len(bad)} school(s) have online_only=1 AND sevp_certified=True — "
+        f"re-run notebook 05 to apply the IPEDS override:\n"
+        f"{bad[['unit_id', 'name', 'state', 'sevp_match']].to_string()}"
+    )
+
+
 def test_hidden_gems_only(df, program_earnings):
     """hidden_gems_only filter: admit_rate >= 30%, no famous alum >= 60 sitelinks, top-25% outcomes."""
     assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
