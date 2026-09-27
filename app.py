@@ -868,6 +868,14 @@ with st.sidebar:
                  "a Liberal Arts transfer track no longer qualifies.",
         )
         require_f1 = st.checkbox("Require F-1 eligibility (SEVP certified)", key="sb_require_f1")
+        include_online_only = st.checkbox(
+            "Include online-only schools",
+            key="sb_include_online_only",
+            help=(
+                "Distance-education-only schools (IPEDS flag). "
+                "F-1 students must attend in person, so these are excluded by default."
+            ),
+        )
 
     hidden_gems = st.toggle(
         "Hidden gems only",
@@ -946,6 +954,7 @@ client = {
     "strict_major":              strict_major,
     "religion":                  religion_key,
     "hidden_gems_only":          hidden_gems,
+    "include_online_only":       include_online_only,
     "weights":                   weights,
 }
 
@@ -1138,6 +1147,8 @@ with tab_find:
                                 badges.append(("F-1 certified", "green"))
                             else:
                                 badges.append(("Not F-1 certified", "red"))
+                            if row.get("online_only") == 1 or row.get("online_only") == 1.0:
+                                badges.append(("Online only", "orange"))
                             row_affil = affil_label(row.get("religious_affil"))
                             if row_affil:
                                 badges.append((row_affil, "gray"))

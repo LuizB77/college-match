@@ -87,6 +87,7 @@ def test_matcher_zero_weights_no_nan(df):
         "majors": None,
         "strict_major": False,
         "religion": None,
+        "include_online_only": True,
         "weights": {k: 0 for k in [
             "low_cost", "grad_rate", "sport_culture", "athlete_opportunity",
             "international_community", "open_admission", "small_school",
@@ -122,6 +123,7 @@ def test_f1_metric_equals_sevp_count(df):
         "gender": "men", "needs_athletic_scholarship": False,
         "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
         "majors": None, "strict_major": False, "religion": None,
+        "include_online_only": True,
         "weights": {"low_cost": 1, "grad_rate": 0, "sport_culture": 0,
                     "athlete_opportunity": 0, "international_community": 0,
                     "open_admission": 0, "small_school": 0,
@@ -422,6 +424,71 @@ def test_program_earnings_cip4_type(program_earnings):
     assert lengths == [4], f"Expected all cip4 values to be 4 chars, got lengths: {lengths}"
 
 
+# ---------------------------------------------------------------------------
+# Online-only schools
+# ---------------------------------------------------------------------------
+
+def test_online_only_column_exists(df):
+    """online_only must be present in the processed dataset after notebook 01 re-run."""
+    assert "online_only" in df.columns, (
+        "online_only column missing — re-run notebooks 01→03→05→06"
+    )
+    n = int((df["online_only"].fillna(0) == 1).sum())
+    assert n >= 10, f"Expected at least 10 online-only schools in dataset, got {n}"
+
+
+def test_online_only_wgu_excluded_by_default(df):
+    """WGU (unit_id=433387, DISTANCEONLY=1) must be excluded when include_online_only is False."""
+    WGU_UID = 433387
+    assert WGU_UID in df["unit_id"].values, "WGU not in dataset"
+    assert df.loc[df["unit_id"] == WGU_UID, "online_only"].iloc[0] == 1.0, (
+        "WGU must have online_only=1"
+    )
+    client = {
+        "name": "online-exclude-test",
+        "require_f1": False, "max_budget": None, "budget_flex": 1.5,
+        "school_types": ["4-year"], "states": None, "city_groups": None,
+        "sport": None, "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": None, "strict_major": False, "religion": None,
+        "hidden_gems_only": False, "include_online_only": False,
+        "weights": {"low_cost": 1, "grad_rate": 0, "sport_culture": 0,
+                    "athlete_opportunity": 0, "international_community": 0,
+                    "open_admission": 0, "small_school": 0,
+                    "entrepreneurship_program": 0, "program_strength": 0},
+    }
+    results, funnel = match(df, client)
+    assert WGU_UID not in results["unit_id"].values, (
+        "WGU (online-only) must not appear when include_online_only=False"
+    )
+    steps = [s for s, _ in funnel]
+    assert any("online" in s.lower() for s in steps), (
+        f"Expected an 'online-only' funnel step, got: {steps}"
+    )
+
+
+def test_online_only_wgu_included_when_toggled(df):
+    """WGU must appear in results when include_online_only=True."""
+    WGU_UID = 433387
+    client = {
+        "name": "online-include-test",
+        "require_f1": False, "max_budget": None, "budget_flex": 1.5,
+        "school_types": ["4-year"], "states": None, "city_groups": None,
+        "sport": None, "gender": "men", "needs_athletic_scholarship": False,
+        "min_grad_rate_4yr": 0.0, "min_grad_rate_2yr": 0.0,
+        "majors": None, "strict_major": False, "religion": None,
+        "hidden_gems_only": False, "include_online_only": True,
+        "weights": {"low_cost": 1, "grad_rate": 0, "sport_culture": 0,
+                    "athlete_opportunity": 0, "international_community": 0,
+                    "open_admission": 0, "small_school": 0,
+                    "entrepreneurship_program": 0, "program_strength": 0},
+    }
+    results, _ = match(df, client)
+    assert WGU_UID in results["unit_id"].values, (
+        "WGU must appear in results when include_online_only=True"
+    )
+
+
 def test_hidden_gems_only(df, program_earnings):
     """hidden_gems_only filter: admit_rate >= 30%, no famous alum >= 60 sitelinks, top-25% outcomes."""
     assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
@@ -524,12 +591,12 @@ def _fresh_at(_apptest_cls):
 
 
 def test_defaults_load(_apptest_cls):
-    """App must load with defaults, no exception, Schools that fit = 3147."""
+    """App must load with defaults, no exception. Online-only excluded by default → 3110."""
     at = _fresh_at(_apptest_cls).run()
     assert not at.exception, f"App crashed on default load: {at.exception}"
     metric = next((m for m in at.metric if "Schools that fit" in m.label), None)
     assert metric is not None, "Missing 'Schools that fit' metric"
-    assert metric.value == "3147", f"Expected 3147 schools with no filters, got {metric.value}"
+    assert metric.value == "3110", f"Expected 3110 schools with defaults (37 online-only excluded), got {metric.value}"
 
 
 def test_athlete_profile(_apptest_cls):
@@ -562,7 +629,7 @@ def test_catholic_filter(_apptest_cls):
     metric = next((m for m in at.metric if "Schools that fit" in m.label), None)
     assert metric is not None
     count = int(metric.value.replace(",", ""))
-    assert count < 3147, f"Expected Catholic filter to reduce count below 3147, got {count}"
+    assert count < 3110, f"Expected Catholic filter to reduce count below 3110, got {count}"
 
 
 def test_zero_weights_no_crash(_apptest_cls):
@@ -690,7 +757,7 @@ def test_explain_exclusion_no_bare_dollars(df):
 
 
 def test_clear_all(_apptest_cls):
-    """After changing filters and clicking 'Clear all filters', count returns to 3147."""
+    """After changing filters and clicking 'Clear all filters', count returns to default 3110."""
     at = _fresh_at(_apptest_cls)
     # Apply a restrictive filter first
     at.session_state["sb_budget"]      = 10_000
@@ -699,7 +766,7 @@ def test_clear_all(_apptest_cls):
     before = next((m for m in at.metric if "Schools that fit" in m.label), None)
     assert before is not None
     before_count = int(before.value.replace(",", ""))
-    assert before_count < 3147
+    assert before_count < 3110
 
     # Click "Clear all filters"
     clear_btn = next((b for b in at.button if "Clear" in b.label), None)
@@ -709,7 +776,7 @@ def test_clear_all(_apptest_cls):
     after = next((m for m in at.metric if "Schools that fit" in m.label), None)
     assert after is not None
     after_count = int(after.value.replace(",", ""))
-    assert after_count == 3147, f"Expected 3147 after clear, got {after_count}"
+    assert after_count == 3110, f"Expected 3110 after clear (online-only excluded by default), got {after_count}"
 
 
 # ---------------------------------------------------------------------------

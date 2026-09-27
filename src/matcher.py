@@ -214,6 +214,11 @@ def match(
         c = c[c["sevp_certified"]]      # no F-1 certification = can't enroll on a student visa
         funnel.append(("After SEVP F-1 certified", len(c)))
 
+    if not client.get("include_online_only", False):
+        if "online_only" in c.columns:
+            c = c[c["online_only"].fillna(0) != 1]
+            funnel.append(("After excluding online-only schools", len(c)))
+
     # --- 1. Hard filters: fail one = excluded. ---
     c = c[c["school_type"].isin(client["school_types"])]
     funnel.append(("After school type", len(c)))
@@ -389,6 +394,10 @@ def explain_exclusion(
     if client.get("require_f1", True):
         if not row.get("sevp_certified"):
             reasons.append("Not F-1 certified (SEVP)")
+
+    if not client.get("include_online_only", False):
+        if row.get("online_only") == 1 or row.get("online_only") == 1.0:
+            reasons.append("Online-only school (F-1 students must study in person)")
 
     if row.get("school_type") not in client["school_types"]:
         reasons.append(f"School type '{row.get('school_type')}' not in {client['school_types']}")
