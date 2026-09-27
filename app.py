@@ -265,6 +265,7 @@ DEFAULTS = {
     "sb_require_f1":    False,
     "sb_hidden_gems":   False,
     "sb_intl_merit":    False,
+    "sb_need_based":    "Not sure",
     "preset_select":    "Balanced",
 }
 
@@ -461,7 +462,7 @@ def _program_list(cips_str: str, major_prefixes):
 
 # ── School detail dialog ───────────────────────────────────────────────────────
 @st.dialog("School details", width="large")
-def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
+def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based_yes: bool = False):
     name    = row["name"]
     unit_id = row.get("unit_id")
     st.header(name, anchor=False)
@@ -493,36 +494,52 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes):
         st.caption("Sticker prices before scholarships or financial aid.")
 
         # International Aid
-        if row.get("offers_intl_aid") is not None:
+        offers_aid = row.get("offers_intl_aid")
+        if offers_aid is not None:
             st.subheader("International Financial Aid", anchor=False)
-            avg_award = row.get("avg_intl_award")
-            pct_aided = row.get("pct_intl_aided")
-            cds_yr    = row.get("cds_year")
-            src_url   = row.get("source_url")
-            a1, a2, a3 = st.columns(3)
-            a1.metric("Offers need-based intl aid", "Yes" if row.get("offers_intl_aid") else "No")
-            a2.metric("Avg award / yr",  f"${avg_award:,.0f}" if pd.notna(avg_award) else "Not reported")
-            a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
-            flags_aid = []
-            if row.get("meets_full_need_intl"):
-                flags_aid.append("Meets 100% of demonstrated need")
-            if row.get("need_blind_intl"):
-                flags_aid.append("Need-blind admission")
-            if pct_aided and pd.notna(pct_aided):
-                flags_aid.append(f"{pct_aided:.0%} of international students receive aid")
+            if offers_aid is False:
+                st.warning(
+                    "This school does not offer need-based financial aid to international students.",
+                    icon="⚠️",
+                )
             else:
-                flags_aid.append("Aid share unknown")
-            if flags_aid:
-                st.markdown("  ·  ".join(flags_aid))
-            caption_parts = []
-            if cds_yr and str(cds_yr) not in ("None", "nan"):
-                caption_parts.append(f"CDS year: {cds_yr}")
-            st.caption(
-                "Source: Common Data Set (Section H6). "
-                + ("  ·  ".join(caption_parts) if caption_parts else "")
-            )
-            if src_url and str(src_url) not in ("None", "nan", "TODO"):
-                st.link_button("View Common Data Set ↗", url=str(src_url))
+                avg_award = row.get("avg_intl_award")
+                pct_aided = row.get("pct_intl_aided")
+                cds_yr    = row.get("cds_year")
+                src_url   = row.get("source_url")
+                a1, a2, a3 = st.columns(3)
+                a1.metric("Offers need-based intl aid", "Yes")
+                a2.metric("Avg award / yr", f"${avg_award:,.0f}" if pd.notna(avg_award) else "Not reported")
+                if need_based_yes and pd.notna(est_net):
+                    a3.metric("Est. net cost if aided / yr", f"${est_net:,.0f}")
+                    st.caption(
+                        f"Estimated cost if aided: \\${est_net:,.0f} "
+                        "(average award for aided international students; "
+                        "actual aid depends on family income)."
+                    )
+                else:
+                    a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
+                    st.caption("Need-based aid; actual award depends on family income.")
+                flags_aid = []
+                if row.get("meets_full_need_intl"):
+                    flags_aid.append("Meets 100% of demonstrated need")
+                if row.get("need_blind_intl"):
+                    flags_aid.append("Need-blind admission")
+                if pct_aided and pd.notna(pct_aided):
+                    flags_aid.append(f"{pct_aided:.0%} of international students receive aid")
+                else:
+                    flags_aid.append("Aid share unknown")
+                if flags_aid:
+                    st.markdown("  ·  ".join(flags_aid))
+                caption_parts = []
+                if cds_yr and str(cds_yr) not in ("None", "nan"):
+                    caption_parts.append(f"CDS year: {cds_yr}")
+                st.caption(
+                    "Source: Common Data Set (Section H6). "
+                    + ("  ·  ".join(caption_parts) if caption_parts else "")
+                )
+                if src_url and str(src_url) not in ("None", "nan", "TODO"):
+                    st.link_button("View Common Data Set ↗", url=str(src_url))
 
         # Athletics
         if row.get("has_athletics"):
@@ -802,6 +819,19 @@ with st.sidebar:
         st.caption(f"Budget: ${budget_val:,}/yr")
         max_budget = budget_val
 
+    need_based = st.radio(
+        "Would the family likely qualify for need-based aid?",
+        ["Yes", "No", "Not sure"],
+        key="sb_need_based",
+        horizontal=True,
+        help=(
+            "'Yes' applies each school's CDS-reported average net cost to the budget filter "
+            "for schools that offer need-based aid to internationals. "
+            "'No' or 'Not sure' always uses sticker price."
+        ),
+    )
+    need_based_yes = (need_based == "Yes")
+
     school_types = st.multiselect(
         "What type of school?", ["2-year", "4-year"],
         key="sb_school_types",
@@ -958,9 +988,9 @@ client = {
     "weights":                   weights,
 }
 
-# ── Swap cost → est_net_cost where intl aid data is present ───────────────────
+# ── Swap cost → est_net_cost where intl aid data is present (only when Yes) ───
 has_aid_estimate = df["est_net_cost"].notna()
-if has_aid_estimate.any():
+if need_based_yes and has_aid_estimate.any():
     df_for_match = df.copy()
     df_for_match.loc[has_aid_estimate, "cost_international"] = df_for_match.loc[
         has_aid_estimate, "est_net_cost"
@@ -972,7 +1002,7 @@ else:
 results, funnel = match(df_for_match, client, program_earnings=program_earnings, alumni_df=alumni_df)
 
 # Restore original sticker cost for display; keep est_net_cost alongside.
-if has_aid_estimate.any() and not results.empty:
+if need_based_yes and has_aid_estimate.any() and not results.empty:
     results = results.copy()
     results["cost_international"] = results.index.map(df["cost_international"])
     results["est_net_cost"]       = results.index.map(df["est_net_cost"])
@@ -1060,13 +1090,13 @@ with tab_find:
                 else:
                     st.markdown("**Passes all filters** for this profile.")
                 if st.button("Details", key="lookup_det"):
-                    show_detail(lookup_row_display, gender, client.get("majors"))
+                    show_detail(lookup_row_display, gender, client.get("majors"), need_based_yes)
             else:
                 st.markdown(f"**Not on your list because:**")
                 for r in reasons:
                     st.markdown(f"- {r}")
                 if st.button("Details", key="lookup_det"):
-                    show_detail(lookup_row_display, gender, client.get("majors"))
+                    show_detail(lookup_row_display, gender, client.get("majors"), need_based_yes)
 
     # Empty state
     if results.empty:
@@ -1120,7 +1150,7 @@ with tab_find:
 
                             cost = row["cost_international"]
                             est  = row.get("est_net_cost")
-                            has_est = pd.notna(est)
+                            has_est = pd.notna(est) and need_based_yes
                             display_cost = est if has_est else cost
                             if pd.notna(display_cost):
                                 cost_text = f"**{money(display_cost)}** per year"
@@ -1154,7 +1184,9 @@ with tab_find:
                                 badges.append((row_affil, "gray"))
                             if row.get("offers_intl_aid") is True:
                                 badges.append(("Intl aid", "blue"))
-                            elif row.get("athletic_aid_tier") in AID_TIERS:
+                            elif row.get("offers_intl_aid") is False:
+                                badges.append(("No aid for internationals", "red"))
+                            if row.get("athletic_aid_tier") in AID_TIERS:
                                 badges.append(("Athletic aid", "blue"))
                             if row.get("offers_entrepreneurship"):
                                 badges.append(("Entrepreneurship", "orange"))
@@ -1188,7 +1220,7 @@ with tab_find:
                             st.caption(f"Why: {' · '.join(filter(None, [w1, w2]))}")
 
                             if st.button("Details", key=f"det_{rank}", use_container_width=True):
-                                show_detail(df.loc[original_idx], gender, client.get("majors"))
+                                show_detail(df.loc[original_idx], gender, client.get("majors"), need_based_yes)
 
             total_results = len(sorted_results)
             if n_shown < total_results:

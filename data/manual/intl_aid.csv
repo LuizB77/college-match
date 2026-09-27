@@ -1,7 +1,7 @@
 unitid,offers_intl_aid,meets_full_need_intl,need_blind_intl,pct_intl_aided,avg_intl_award,cds_year,source_url,intl_aid_page_url
-166027,TRUE,TRUE,TRUE,0.788,83013,2025-26,https://oira.harvard.edu/files/2026/07/CDS_2025-2026.pdf,https://college.harvard.edu/financial-aid
-130794,TRUE,TRUE,TRUE,0.650,84185,2025-26,https://oir.yale.edu/sites/default/files/yale_cds_2025-26_md_20260616.pdf,https://admissions.yale.edu/international
-186131,TRUE,TRUE,TRUE,0.788,86736,2024-25,https://ir.princeton.edu/sites/g/files/toruqf2041/files/documents/CDS_2526_Princeton_v2.pdf,https://admission.princeton.edu/cost-aid
+166027,TRUE,TRUE,TRUE,0.7884,83013,2025-26,https://oira.harvard.edu/files/2026/07/CDS_2025-2026.pdf,https://college.harvard.edu/financial-aid
+130794,TRUE,TRUE,TRUE,0.6501,84185,2025-26,https://oir.yale.edu/sites/default/files/yale_cds_2025-26_md_20260616.pdf,https://admissions.yale.edu/international
+186131,TRUE,TRUE,TRUE,0.7876,86736,2024-25,https://ir.princeton.edu/sites/g/files/toruqf2041/files/documents/CDS_2526_Princeton_v2.pdf,https://admission.princeton.edu/cost-aid
 190150,TRUE,TRUE,FALSE,,,,https://undergrad.admissions.columbia.edu/apply/international/aid
 215062,TRUE,TRUE,FALSE,,,,https://admissions.upenn.edu/affording-penn/international-aid
 217156,TRUE,TRUE,TRUE,,,,https://admission.brown.edu/financial-aid
