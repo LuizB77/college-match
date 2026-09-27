@@ -80,8 +80,8 @@ def _eada_info() -> tuple[str, str]:
     return f"{yr - 1}–{str(yr)[2:]}", str(yr)
 
 _EADA_SURVEY_YEAR, _EADA_RELEASE_YEAR = _eada_info()
-_SCORECARD_DATE  = _git_file_date("data/processed/schools_with_majors.csv")
-_DATA_DATE_SCORECARD = f"released {_SCORECARD_DATE}, covers 2022–23 academic year"
+# Source: collegescorecard.ed.gov/data — "last updated June 10, 2026"
+_DATA_DATE_SCORECARD = "released June 10, 2026 (outcomes measured for earlier graduating classes)"
 _DATA_DATE_EADA      = f"{_EADA_SURVEY_YEAR} survey (released {_EADA_RELEASE_YEAR})"
 _DATA_DATE_SEVP      = _sevp_list_date()
 _DATA_DATE_WIKIDATA  = _git_file_date("data/processed/notable_alumni.csv")
@@ -1450,7 +1450,7 @@ marketed internationally.
     # ── Where the data comes from ─────────────────────────────────────────────
     st.header("Where the data comes from", anchor=False)
     st.caption(
-        f"**Data as of:** College Scorecard {_DATA_DATE_SCORECARD} · "
+        f"**Data as of:** College Scorecard, {_DATA_DATE_SCORECARD} · "
         f"EADA {_DATA_DATE_EADA} · "
         f"SEVP list {_DATA_DATE_SEVP} · "
         f"Wikidata {_DATA_DATE_WIKIDATA}. "

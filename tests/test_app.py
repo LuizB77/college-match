@@ -15,7 +15,7 @@ import pytest
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.matcher import load_data, match, explain_exclusion
+from src.matcher import load_data, match, explain_exclusion, _program_strength_percentiles
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -373,6 +373,53 @@ def test_program_strength_in_match(df, program_earnings):
     results, funnel = match(df, client, program_earnings=program_earnings)
     assert not results.empty
     assert results["match_score"].notna().all()
+
+
+def test_program_strength_produces_real_values(df, program_earnings):
+    """_program_strength_percentiles must assign non-neutral scores to at least 100 schools for CIP 52."""
+    assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
+    scores = _program_strength_percentiles(df, ["52"], program_earnings)
+    non_neutral = scores[scores != 0.5]
+    assert len(non_neutral) >= 100, (
+        f"Expected at least 100 schools with a real program_strength for major 52, got {len(non_neutral)}. "
+        "cip4 coercion or earn_n filter may have broken the pipeline."
+    )
+
+
+def test_program_strength_known_school(df, program_earnings):
+    """Western Governors University (unit_id=433387) has CIP 5202 with earn_n=4667; must get a real score."""
+    assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
+    WGU_UID = 433387  # CIP 5202, earn_n=4667 — largest business program in dataset
+    assert WGU_UID in df["unit_id"].values, "WGU not in dataset"
+    scores = _program_strength_percentiles(df, ["52"], program_earnings)
+    wgu_row = df[df["unit_id"] == WGU_UID]
+    assert not wgu_row.empty
+    score = scores.get(wgu_row.index[0], 0.5)
+    assert score != 0.5, (
+        f"WGU (unit_id={WGU_UID}) has large business earn data but got neutral 0.5 program_strength. "
+        "cip4 type coercion likely broken."
+    )
+    assert 0.0 <= score <= 1.0, f"program_strength out of [0,1]: {score}"
+
+
+def test_program_earnings_cip4_type(program_earnings):
+    """load_program_earnings must produce cip4 as zero-padded strings with no '.0' suffix."""
+    assert program_earnings is not None, "program_earnings.csv missing — see test_program_earnings_file"
+    # load_program_earnings loads cip4 as str and zero-pads; dtype must be object (string), not numeric
+    assert program_earnings["cip4"].dtype == object, (
+        f"Expected cip4 dtype object (string), got {program_earnings['cip4'].dtype}. "
+        "load_program_earnings must load cip4 with dtype=str."
+    )
+    # Values must be clean 4-char strings — no float '5202.0' which would break prefix matching
+    sample = program_earnings["cip4"].head(50).tolist()
+    dotted = [v for v in sample if isinstance(v, str) and "." in v]
+    assert not dotted, (
+        f"cip4 contains float-like strings: {dotted}. "
+        "Prefix matching (cip4.startswith('52')) will silently produce wrong results."
+    )
+    # Every non-null value must be exactly 4 characters (zero-padded)
+    lengths = program_earnings["cip4"].dropna().str.len().unique().tolist()
+    assert lengths == [4], f"Expected all cip4 values to be 4 chars, got lengths: {lengths}"
 
 
 def test_hidden_gems_only(df, program_earnings):
