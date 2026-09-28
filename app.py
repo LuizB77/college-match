@@ -525,7 +525,10 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
                 a1, a2, a3 = st.columns(3)
                 a1.metric("Offers need-based intl aid", "Yes")
                 a2.metric("Avg award / yr", f"${avg_award:,.0f}" if pd.notna(avg_award) else "Not reported")
-                if need_based_yes and pd.notna(est_net):
+                _det_pct_known  = pct_aided is not None and pd.notna(pct_aided)
+                _det_pct_common = _det_pct_known and pct_aided >= 0.25
+                _show_net = need_based_yes and pd.notna(est_net) and (_det_pct_common or not _det_pct_known)
+                if _show_net:
                     a3.metric("Est. net cost if aided / yr", f"${est_net:,.0f}")
                     st.caption(
                         f"Estimated cost if aided: \\${est_net:,.0f} "
@@ -535,14 +538,24 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
                 else:
                     a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
                     st.caption("Need-based aid; actual award depends on family income.")
+                # Prominent aid odds line
+                if _det_pct_known:
+                    _avg_disp = f" (average {money(avg_award)}/yr)" if pd.notna(avg_award) else ""
+                    if _det_pct_common:
+                        st.markdown(
+                            f"**{pct_aided:.0%} of international students receive aid{_avg_disp}**"
+                        )
+                    else:
+                        st.warning(
+                            f"Aid is rare here: only {pct_aided:.0%} of internationals receive it.",
+                            icon="⚠️",
+                        )
                 flags_aid = []
                 if row.get("meets_full_need_intl"):
                     flags_aid.append("Meets 100% of demonstrated need")
                 if row.get("need_blind_intl"):
                     flags_aid.append("Need-blind admission")
-                if pct_aided and pd.notna(pct_aided):
-                    flags_aid.append(f"{pct_aided:.0%} of international students receive aid")
-                else:
+                if not _det_pct_known:
                     flags_aid.append("Aid share unknown")
                 if flags_aid:
                     st.markdown("  ·  ".join(flags_aid))
@@ -1004,7 +1017,10 @@ client = {
 }
 
 # ── Swap cost → est_net_cost where intl aid data is present (only when Yes) ───
-has_aid_estimate = df["est_net_cost"].notna()
+# Only apply est_net_cost when pct_intl_aided is unknown (we can't call it rare)
+# or >= 0.25 (aid is common enough to meaningfully reduce expected cost).
+_pct_col = df["pct_intl_aided"] if "pct_intl_aided" in df.columns else pd.Series(float("nan"), index=df.index)
+has_aid_estimate = df["est_net_cost"].notna() & (_pct_col.isna() | (_pct_col >= 0.25))
 if need_based_yes and has_aid_estimate.any():
     df_for_match = df.copy()
     df_for_match.loc[has_aid_estimate, "cost_international"] = df_for_match.loc[
@@ -1165,21 +1181,28 @@ with tab_find:
 
                             cost = row["cost_international"]
                             est  = row.get("est_net_cost")
-                            has_est = pd.notna(est) and need_based_yes
+                            _card_pct   = row.get("pct_intl_aided")
+                            _card_avg   = row.get("avg_intl_award")
+                            _pct_known  = pd.notna(_card_pct)
+                            _pct_common = _pct_known and _card_pct >= 0.25
+                            has_est = pd.notna(est) and need_based_yes and (_pct_common or not _pct_known)
                             display_cost = est if has_est else cost
                             if pd.notna(display_cost):
                                 cost_text = f"**{money(display_cost)}** per year"
                             else:
                                 cost_text = "**Cost unknown**"
                             st.markdown(cost_text)
-                            if has_est:
-                                pct_aided = row.get("pct_intl_aided")
-                                aided_note = (
-                                    f" · {pct_aided:.0%} of internationals receive aid"
-                                    if pd.notna(pct_aided)
-                                    else " · aid share unknown"
-                                )
-                                st.caption(f"Estimated cost if aided{aided_note}")
+                            # Aid odds — always shown when data exists
+                            if _pct_known:
+                                _avg_str = f" · avg {money(_card_avg)}" if pd.notna(_card_avg) else ""
+                                if has_est:
+                                    st.caption(f"Est. cost if aided · {_card_pct:.0%} of internationals receive aid{_avg_str}")
+                                elif need_based_yes and not _pct_common:
+                                    st.caption(f"Aid is rare here: only {_card_pct:.0%} of internationals receive it")
+                                else:
+                                    st.markdown(f"{_card_pct:.0%} of internationals receive aid{_avg_str}")
+                            elif has_est:
+                                st.caption("Estimated cost if aided · aid share unknown")
                             else:
                                 st.caption("sticker price before scholarships")
 
@@ -1197,8 +1220,12 @@ with tab_find:
                             row_affil = affil_label(row.get("religious_affil"))
                             if row_affil:
                                 badges.append((row_affil, "gray"))
+                            _badge_pct = row.get("pct_intl_aided")
                             if row.get("offers_intl_aid") is True:
-                                badges.append(("Intl aid", "blue"))
+                                if pd.notna(_badge_pct) and _badge_pct >= 0.5:
+                                    badges.append(("Aid for most internationals", "blue"))
+                                else:
+                                    badges.append(("Intl aid", "blue"))
                             elif row.get("offers_intl_aid") is False:
                                 badges.append(("No aid for internationals", "red"))
                             if row.get("athletic_aid_tier") in AID_TIERS:

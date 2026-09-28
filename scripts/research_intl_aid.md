@@ -108,3 +108,26 @@ A row is flagged (`quality = "flagged"`) if any of:
 - `pct_intl_aided` or `avg_intl_award` is present but `source_url` is missing
 
 Flagged rows are excluded from the app. Fix the underlying data issue, then re-run the validator.
+
+## Queue cap
+
+Stop the research queue when **either** of the following is true:
+
+1. **200 schools done**: the number of rows in `intl_aid_queue.csv` with `status = filled` or
+   `status = policy_only` reaches 200.
+
+2. **Batch quality drops**: a single batch's share of `not_found` results exceeds 60 % of
+   the schools attempted in that batch (e.g., 13 out of 20 not found → 65 % → stop).
+
+**Rationale:** Beyond 200 filled/policy rows the marginal value per school decreases while
+research effort stays constant. A >60 % not-found rate means the remaining queue is dominated
+by schools whose CDS is not publicly accessible; continuing wastes time without improving
+app coverage.
+
+**How to check before starting a batch:**
+```python
+import pandas as pd
+q = pd.read_csv("data/manual/intl_aid_queue.csv")
+done = q["status"].isin(["filled", "policy_only"]).sum()
+print(f"{done} done — cap is 200")
+```
