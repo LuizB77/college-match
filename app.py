@@ -529,27 +529,20 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
                 _det_pct_common = _det_pct_known and pct_aided >= 0.25
                 _show_net = need_based_yes and pd.notna(est_net) and _det_pct_known and pct_aided >= 0.25
                 _full_cover = pd.notna(avg_award) and pd.notna(row.get("cds_total_cost")) and avg_award >= row.get("cds_total_cost")
-                if _show_net:
-                    if _full_cover:
-                        a3.metric("Est. net cost if aided / yr", "~\\$0")
-                        st.caption(
-                            "Aid can cover the full cost for aided students "
-                            "(average award ≥ CDS total cost; actual aid depends on family income)."
-                        )
-                    else:
-                        a3.metric("Est. net cost if aided / yr", f"${est_net:,.0f}")
-                        st.caption(
-                            f"Estimated cost if aided: \\${est_net:,.0f} "
-                            "(average award for aided international students; "
-                            "actual aid depends on family income)."
-                        )
+                if _full_cover:
+                    with a3:
+                        st.markdown("**Aid can cover the full cost for aided students**")
+                    st.caption("Average award ≥ CDS total cost; actual aid depends on family income.")
+                elif _show_net:
+                    a3.metric("Est. net cost if aided / yr", f"${est_net:,.0f}")
+                    st.caption(
+                        f"Estimated cost if aided: \\${est_net:,.0f} "
+                        "(average award for aided international students; "
+                        "actual aid depends on family income)."
+                    )
                 else:
-                    if _full_cover and pd.notna(est_net):
-                        a3.metric("Est. net cost / yr", "~\\$0")
-                        st.caption("Aid can cover the full cost for aided students (average award ≥ CDS total cost).")
-                    else:
-                        a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
-                        st.caption("Need-based aid; actual award depends on family income.")
+                    a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
+                    st.caption("Need-based aid; actual award depends on family income.")
                 # Prominent aid odds line
                 if _det_pct_known:
                     _avg_disp = f" (average {money(avg_award)}/yr)" if pd.notna(avg_award) else ""
