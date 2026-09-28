@@ -111,7 +111,7 @@ Flagged rows are excluded from the app. Fix the underlying data issue, then re-r
 
 ## Queue cap
 
-Stop the research queue when **either** of the following is true:
+Stop the research queue when **any** of the following is true:
 
 1. **200 schools done**: the number of rows in `intl_aid_queue.csv` with `status = filled` or
    `status = policy_only` reaches 200.
@@ -119,10 +119,16 @@ Stop the research queue when **either** of the following is true:
 2. **Batch quality drops**: a single batch's share of `not_found` results exceeds 60 % of
    the schools attempted in that batch (e.g., 13 out of 20 not found → 65 % → stop).
 
+3. **Consecutive low fill rate**: two consecutive batches each have a filled rate below 30 %
+   (filled ÷ attempted, where attempted = filled + policy_only + not_found for that batch).
+   Pause the queue and report the fill rates for both batches before continuing.
+
 **Rationale:** Beyond 200 filled/policy rows the marginal value per school decreases while
 research effort stays constant. A >60 % not-found rate means the remaining queue is dominated
 by schools whose CDS is not publicly accessible; continuing wastes time without improving
-app coverage.
+app coverage. Two consecutive under-30 % fill batches signal the queue has shifted to schools
+that either don't publish H6 data or only offer merit aid — worth reassessing priority before
+continuing.
 
 **How to check before starting a batch:**
 ```python
@@ -130,4 +136,28 @@ import pandas as pd
 q = pd.read_csv("data/manual/intl_aid_queue.csv")
 done = q["status"].isin(["filled", "policy_only"]).sum()
 print(f"{done} done — cap is 200")
+
+# Check fill rate for the last two batches
+attempted = q[q["attempted_date"].notna() & (q["status"] != "pending")]
+attempted = attempted.sort_values("attempted_date")
+for date, grp in attempted.groupby("attempted_date"):
+    filled = (grp["status"] == "filled").sum()
+    total = len(grp)
+    print(f"{date}: {filled}/{total} filled ({filled/total:.0%})")
+```
+
+## Queue filtering
+
+Before adding a school to the queue, verify it is not online-only. Schools with
+`online_only = 1` in `data/processed/schools_clean.csv` do not have a residential campus
+and cannot meaningfully be compared on CDS H6 data — skip them entirely.
+
+```python
+import pandas as pd
+schools = pd.read_csv("data/processed/schools_clean.csv")
+online_ids = set(schools.loc[schools["online_only"] == 1, "unit_id"])
+
+q = pd.read_csv("data/manual/intl_aid_queue.csv")
+# Drop any pending online-only rows before processing
+q = q[~((q["unit_id"].isin(online_ids)) & (q["status"] == "pending"))]
 ```
