@@ -58,26 +58,26 @@ unit_id,school_name,priority_group,status,attempted_date,notes
 207582,Oral Roberts University,2,not_found,2026-09-27,
 227757,Rice University,2,filled,2026-09-27,
 152080,University of Notre Dame,2,policy_only,2026-09-27,
-165662,Emerson College,2,pending,,
-144740,DePaul University,2,pending,,
-136215,Nova Southeastern University,2,pending,,
-168005,Suffolk University,2,pending,,
-189097,Barnard College,2,pending,,
-426314,Embry-Riddle Aeronautical University-Worldwide,2,pending,,
-195003,Rochester Institute of Technology,2,pending,,
-143084,Augustana College,2,pending,,
-228875,Texas Christian University,2,pending,,
-164368,Hult International Business School,2,pending,,
-122931,Santa Clara University,2,pending,,
-137847,The University of Tampa,2,pending,,
-122612,University of San Francisco,2,pending,,
-169080,Calvin University,2,pending,,
-194310,Pace University,2,pending,,
-131520,Howard University,2,pending,,
-150400,DePauw University,2,pending,,
-212601,Gannon University,2,pending,,
-166939,Mount Holyoke College,2,pending,,
-132657,Lynn University,2,pending,,
+165662,Emerson College,2,policy_only,2026-09-28,"CDS behind SSO; merit scholarships only, no need-based"
+144740,DePaul University,2,policy_only,2026-09-28,H6 blank in CDS; institutional scholarships confirmed
+136215,Nova Southeastern University,2,policy_only,2026-09-28,CDS not found; international scholarships confirmed
+168005,Suffolk University,2,policy_only,2026-09-28,CDS not found; merit scholarships up to 50% tuition
+189097,Barnard College,2,filled,2026-09-28,"H6 38/508, avg $78,902, G1 $95,724"
+426314,Embry-Riddle Aeronautical University-Worldwide,2,not_found,2026-09-28,Fully online campus; no standard residential CDS
+195003,Rochester Institute of Technology,2,policy_only,2026-09-28,H6 blank in CDS; merit scholarships confirmed
+143084,Augustana College,2,filled,2026-09-28,"H6 506/506, avg $39,902, G1 $66,208"
+228875,Texas Christian University,2,filled,2026-09-28,"H6 422/493, avg $52,776, G1 $81,610"
+164368,Hult International Business School,2,not_found,2026-09-28,No CDS accessible; specialized international school
+122931,Santa Clara University,2,filled,2026-09-28,"H6 57/473, avg $55,941, G1 $86,970"
+137847,The University of Tampa,2,policy_only,2026-09-28,CDS not found; partial merit scholarships confirmed
+122612,University of San Francisco,2,filled,2026-09-28,"H6 371/483, avg $26,650, G1 $80,802"
+169080,Calvin University,2,filled,2026-09-28,"H6 478/488, avg $29,234, G1 $55,200"
+194310,Pace University,2,policy_only,2026-09-28,CDS PDF blocked; merit scholarships confirmed
+131520,Howard University,2,policy_only,2026-09-28,H6 blank in CDS; institutional aid via ISFAA confirmed
+150400,DePauw University,2,policy_only,2026-09-28,H6 blank in CDS; merit + limited need-based confirmed
+212601,Gannon University,2,policy_only,2026-09-28,CDS not found; international award confirmed
+166939,Mount Holyoke College,2,filled,2026-09-28,"H6 257/417, avg $53,460, G1 $93,046"
+132657,Lynn University,2,policy_only,2026-09-28,CDS download blocked; merit scholarships $16k-$28k confirmed
 133881,Florida Institute of Technology,2,pending,,
 202523,Denison University,2,pending,,
 232557,Liberty University,2,pending,,
