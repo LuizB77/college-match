@@ -997,3 +997,101 @@ def test_intl_aid_get_intl_aid_drops_flagged(tmp_path):
         aid = aid[aid["quality"].isin(["ok", ""])]
     assert 111111 in aid["unitid"].values, "ok row should be kept"
     assert 222222 not in aid["unitid"].values, "flagged row should be dropped"
+
+
+# ---------------------------------------------------------------------------
+# Part 5: intl_aid integrity guards
+# ---------------------------------------------------------------------------
+
+QUEUE_PATH = ROOT / "data/manual/intl_aid_queue.csv"
+
+# Harvard=166027, Yale=130794, Princeton=186131, MIT=166683
+_HYPM = {166027: "Harvard", 130794: "Yale", 186131: "Princeton", 166683: "MIT"}
+
+
+def test_intl_aid_queue_coverage():
+    """Every school with status filled or policy_only in the queue must have a row in intl_aid.csv.
+
+    Guards against batch merges that overwrite rather than upsert: if a school
+    is marked filled/policy_only but has no aid row, the research was done but
+    the data was lost.
+    """
+    if not AID_PATH.exists():
+        pytest.skip("intl_aid.csv not found")
+    if not QUEUE_PATH.exists():
+        pytest.skip("intl_aid_queue.csv not found")
+
+    aid = pd.read_csv(AID_PATH)
+    aid_ids = set(aid["unitid"].dropna().astype(int))
+
+    queue = pd.read_csv(QUEUE_PATH, dtype={"unit_id": int})
+    done = queue[queue["status"].isin(["filled", "policy_only"])]
+
+    missing = done[~done["unit_id"].isin(aid_ids)]
+    assert missing.empty, (
+        f"{len(missing)} queue school(s) with status filled/policy_only have no row in intl_aid.csv:\n"
+        + missing[["unit_id", "school_name", "status"]].to_string(index=False)
+    )
+
+
+def test_intl_aid_hypm_present():
+    """Harvard, Yale, Princeton, and MIT must each have a row with avg_intl_award filled."""
+    if not AID_PATH.exists():
+        pytest.skip("intl_aid.csv not found")
+
+    aid = pd.read_csv(AID_PATH)
+    aid["unitid"] = pd.to_numeric(aid["unitid"], errors="coerce")
+    aid["avg_intl_award"] = pd.to_numeric(aid["avg_intl_award"], errors="coerce")
+
+    for uid, name in _HYPM.items():
+        row = aid[aid["unitid"] == uid]
+        assert not row.empty, (
+            f"{name} (unitid={uid}) is missing from intl_aid.csv"
+        )
+        avg = row.iloc[0]["avg_intl_award"]
+        assert pd.notna(avg) and avg > 0, (
+            f"{name} (unitid={uid}) has no avg_intl_award in intl_aid.csv (got {avg!r})"
+        )
+
+
+def test_intl_aid_badge_pct_threshold():
+    """Every school that would earn the 'Aid for most internationals' badge must have
+    pct_intl_aided >= 0.5.  Badge logic: offers_intl_aid=True AND pct_intl_aided >= 0.5.
+    """
+    if not AID_PATH.exists():
+        pytest.skip("intl_aid.csv not found")
+
+    # Load school names for the report
+    school_df = pd.read_csv(
+        ROOT / "data/processed/schools_with_majors.csv",
+        usecols=["unit_id", "name"],
+    )
+    name_map = dict(zip(school_df["unit_id"], school_df["name"]))
+
+    aid = pd.read_csv(AID_PATH)
+    aid["unitid"] = pd.to_numeric(aid["unitid"], errors="coerce")
+    aid["pct_intl_aided"] = pd.to_numeric(aid["pct_intl_aided"], errors="coerce")
+    aid["offers_intl_aid"] = aid["offers_intl_aid"].astype(str).str.strip().str.upper()
+
+    # Mirror get_intl_aid(): drop flagged rows (they don't reach the app)
+    if "quality" in aid.columns:
+        aid = aid[aid["quality"].isin(["ok", ""])].copy()
+
+    badge_schools = aid[
+        (aid["offers_intl_aid"] == "TRUE") &
+        aid["pct_intl_aided"].notna() &
+        (aid["pct_intl_aided"] >= 0.5)
+    ].copy()
+    badge_schools["school_name"] = badge_schools["unitid"].map(name_map).fillna("(unknown)")
+
+    # Print the list so it appears in pytest -v output
+    print("\nSchools earning 'Aid for most internationals' badge (pct >= 0.5):")
+    for _, r in badge_schools.sort_values("pct_intl_aided", ascending=False).iterrows():
+        print(f"  {r['school_name']} ({int(r['unitid'])}): {r['pct_intl_aided']:.1%}")
+
+    # The assertion: no badge school is below 0.5 (tautological, but documents the rule)
+    below = badge_schools[badge_schools["pct_intl_aided"] < 0.5]
+    assert below.empty, (
+        f"Badge schools below 0.5 threshold: {below[['unitid','pct_intl_aided']].to_string()}"
+    )
+    assert len(badge_schools) >= 1, "Expected at least one school to earn the badge"

@@ -527,7 +527,7 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
                 a2.metric("Avg award / yr", f"${avg_award:,.0f}" if pd.notna(avg_award) else "Not reported")
                 _det_pct_known  = pct_aided is not None and pd.notna(pct_aided)
                 _det_pct_common = _det_pct_known and pct_aided >= 0.25
-                _show_net = need_based_yes and pd.notna(est_net) and (_det_pct_common or not _det_pct_known)
+                _show_net = need_based_yes and pd.notna(est_net) and _det_pct_known and pct_aided >= 0.25
                 if _show_net:
                     a3.metric("Est. net cost if aided / yr", f"${est_net:,.0f}")
                     st.caption(
@@ -1020,7 +1020,7 @@ client = {
 # Only apply est_net_cost when pct_intl_aided is unknown (we can't call it rare)
 # or >= 0.25 (aid is common enough to meaningfully reduce expected cost).
 _pct_col = df["pct_intl_aided"] if "pct_intl_aided" in df.columns else pd.Series(float("nan"), index=df.index)
-has_aid_estimate = df["est_net_cost"].notna() & (_pct_col.isna() | (_pct_col >= 0.25))
+has_aid_estimate = df["est_net_cost"].notna() & _pct_col.notna() & (_pct_col >= 0.25)
 if need_based_yes and has_aid_estimate.any():
     df_for_match = df.copy()
     df_for_match.loc[has_aid_estimate, "cost_international"] = df_for_match.loc[
@@ -1185,7 +1185,7 @@ with tab_find:
                             _card_avg   = row.get("avg_intl_award")
                             _pct_known  = pd.notna(_card_pct)
                             _pct_common = _pct_known and _card_pct >= 0.25
-                            has_est = pd.notna(est) and need_based_yes and (_pct_common or not _pct_known)
+                            has_est = pd.notna(est) and need_based_yes and _pct_known and _card_pct >= 0.25
                             display_cost = est if has_est else cost
                             if pd.notna(display_cost):
                                 cost_text = f"**{money(display_cost)}** per year"
