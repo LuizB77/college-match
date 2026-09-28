@@ -383,7 +383,7 @@ if not intl_aid.empty:
     # Use CDS total cost when available (more accurate than IPEDS); fall back to IPEDS cost_international
     _base_cost = df["cds_total_cost"].where(df["cds_total_cost"].notna(), df["cost_international"]) \
         if "cds_total_cost" in df.columns else df["cost_international"]
-    df["est_net_cost"] = _base_cost - df["avg_intl_award"]
+    df["est_net_cost"] = (_base_cost - df["avg_intl_award"]).clip(lower=0)
 else:
     df["est_net_cost"]         = float("nan")
     df["offers_intl_aid"]      = None
@@ -528,16 +528,28 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
                 _det_pct_known  = pct_aided is not None and pd.notna(pct_aided)
                 _det_pct_common = _det_pct_known and pct_aided >= 0.25
                 _show_net = need_based_yes and pd.notna(est_net) and _det_pct_known and pct_aided >= 0.25
+                _full_cover = pd.notna(avg_award) and pd.notna(row.get("cds_total_cost")) and avg_award >= row.get("cds_total_cost")
                 if _show_net:
-                    a3.metric("Est. net cost if aided / yr", f"${est_net:,.0f}")
-                    st.caption(
-                        f"Estimated cost if aided: \\${est_net:,.0f} "
-                        "(average award for aided international students; "
-                        "actual aid depends on family income)."
-                    )
+                    if _full_cover:
+                        a3.metric("Est. net cost if aided / yr", "~\\$0")
+                        st.caption(
+                            "Aid can cover the full cost for aided students "
+                            "(average award ≥ CDS total cost; actual aid depends on family income)."
+                        )
+                    else:
+                        a3.metric("Est. net cost if aided / yr", f"${est_net:,.0f}")
+                        st.caption(
+                            f"Estimated cost if aided: \\${est_net:,.0f} "
+                            "(average award for aided international students; "
+                            "actual aid depends on family income)."
+                        )
                 else:
-                    a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
-                    st.caption("Need-based aid; actual award depends on family income.")
+                    if _full_cover and pd.notna(est_net):
+                        a3.metric("Est. net cost / yr", "~\\$0")
+                        st.caption("Aid can cover the full cost for aided students (average award ≥ CDS total cost).")
+                    else:
+                        a3.metric("Est. net cost / yr", f"${est_net:,.0f}" if pd.notna(est_net) else "—")
+                        st.caption("Need-based aid; actual award depends on family income.")
                 # Prominent aid odds line
                 if _det_pct_known:
                     _avg_disp = f" (average {money(avg_award)}/yr)" if pd.notna(avg_award) else ""
@@ -1186,8 +1198,14 @@ with tab_find:
                             _pct_known  = pd.notna(_card_pct)
                             _pct_common = _pct_known and _card_pct >= 0.25
                             has_est = pd.notna(est) and need_based_yes and _pct_known and _card_pct >= 0.25
+                            _card_full_cover = (
+                                pd.notna(_card_avg) and pd.notna(row.get("cds_total_cost"))
+                                and _card_avg >= row.get("cds_total_cost")
+                            )
                             display_cost = est if has_est else cost
-                            if pd.notna(display_cost):
+                            if has_est and _card_full_cover:
+                                cost_text = "**Aid can cover the full cost** for aided students"
+                            elif pd.notna(display_cost):
                                 cost_text = f"**{money(display_cost)}** per year"
                             else:
                                 cost_text = "**Cost unknown**"
@@ -1195,8 +1213,10 @@ with tab_find:
                             # Aid odds — always shown when data exists
                             if _pct_known:
                                 _avg_str = f" · avg {money(_card_avg)}" if pd.notna(_card_avg) else ""
-                                if has_est:
+                                if has_est and not _card_full_cover:
                                     st.caption(f"Est. cost if aided · {_card_pct:.0%} of internationals receive aid{_avg_str}")
+                                elif has_est and _card_full_cover:
+                                    st.caption(f"{_card_pct:.0%} of internationals receive aid")
                                 elif need_based_yes and not _pct_common:
                                     st.caption(f"Aid is rare here: only {_card_pct:.0%} of internationals receive it")
                                 else:

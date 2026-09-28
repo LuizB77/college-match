@@ -1054,6 +1054,43 @@ def test_intl_aid_hypm_present():
         )
 
 
+def test_intl_aid_est_net_cost_floor():
+    """est_net_cost must be >= 0 for all rows.  Harvard (166027) has avg > cds_total_cost
+    so its raw subtraction is negative; the floor must clamp it to 0."""
+    if not AID_PATH.exists():
+        pytest.skip("intl_aid.csv not found")
+
+    aid = pd.read_csv(AID_PATH)
+    aid["avg_intl_award"]  = pd.to_numeric(aid["avg_intl_award"],  errors="coerce")
+    aid["cds_total_cost"]  = pd.to_numeric(aid["cds_total_cost"],  errors="coerce")
+
+    # Harvard specifically: avg ($83,013) > cost ($82,866) → raw net would be -$147
+    harvard = aid[aid["unitid"] == 166027]
+    assert not harvard.empty, "Harvard (166027) missing from intl_aid.csv"
+    h = harvard.iloc[0]
+    assert pd.notna(h["avg_intl_award"]) and pd.notna(h["cds_total_cost"]), (
+        "Harvard is missing avg_intl_award or cds_total_cost"
+    )
+    assert h["avg_intl_award"] >= h["cds_total_cost"], (
+        f"Harvard: expected avg ({h['avg_intl_award']}) >= cost ({h['cds_total_cost']}) "
+        "— test precondition no longer holds"
+    )
+
+    # Simulate the app's est_net_cost computation with the floor
+    both = aid.dropna(subset=["avg_intl_award", "cds_total_cost"])
+    est_net = (both["cds_total_cost"] - both["avg_intl_award"]).clip(lower=0)
+    assert (est_net >= 0).all(), (
+        f"est_net_cost has negative values after floor:\n"
+        f"{both.loc[est_net < 0, ['unitid', 'avg_intl_award', 'cds_total_cost']].to_string()}"
+    )
+    # Harvard's floored net cost must be 0
+    h_idx = both[both["unitid"] == 166027].index
+    assert not h_idx.empty
+    assert est_net.loc[h_idx[0]] == 0, (
+        f"Harvard's floored est_net_cost should be 0, got {est_net.loc[h_idx[0]]}"
+    )
+
+
 def test_intl_aid_badge_pct_threshold():
     """Every school that would earn the 'Aid for most internationals' badge must have
     pct_intl_aided >= 0.5.  Badge logic: offers_intl_aid=True AND pct_intl_aided >= 0.5.
