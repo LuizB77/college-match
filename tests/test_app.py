@@ -1132,3 +1132,75 @@ def test_intl_aid_badge_pct_threshold():
         f"Badge schools below 0.5 threshold: {below[['unitid','pct_intl_aided']].to_string()}"
     )
     assert len(badge_schools) >= 1, "Expected at least one school to earn the badge"
+
+
+# ---------------------------------------------------------------------------
+# C3 — How to apply from Brazil
+# ---------------------------------------------------------------------------
+
+APPLY_COSTS_PATH    = ROOT / "data/manual/apply_costs.csv"
+CDS_ADMISSIONS_PATH = ROOT / "data/manual/cds_admissions.csv"
+
+
+def test_apply_costs_completeness():
+    """Every row of apply_costs.csv must have source_url and date_checked."""
+    assert APPLY_COSTS_PATH.exists(), "apply_costs.csv is missing"
+    df = pd.read_csv(APPLY_COSTS_PATH)
+    missing_url = df[df["source_url"].isna() | (df["source_url"].astype(str).str.strip() == "")]
+    assert missing_url.empty, (
+        f"Rows missing source_url: {missing_url['item'].tolist()}"
+    )
+    missing_date = df[df["date_checked"].isna() | (df["date_checked"].astype(str).str.strip() == "")]
+    assert missing_date.empty, (
+        f"Rows missing date_checked: {missing_date['item'].tolist()}"
+    )
+
+
+def test_i18n_pt_coverage():
+    """Every key in the i18n dict must have both EN and PT entries."""
+    from src.i18n import _T
+    missing = []
+    for key, entry in _T.items():
+        if "EN" not in entry:
+            missing.append(f"{key}: missing EN")
+        if "PT" not in entry:
+            missing.append(f"{key}: missing PT")
+    assert not missing, "i18n coverage gaps:\n" + "\n".join(missing)
+
+
+def test_i18n_pt_toggle_changes_heading():
+    """t() returns different text for EN vs PT for the apply_heading key."""
+    from src.i18n import t
+    en = t("apply_heading", "EN")
+    pt = t("apply_heading", "PT")
+    assert en != pt, "EN and PT heading must differ"
+    assert "Brazil" in en
+    assert "Brasil" in pt
+
+
+def test_apply_section_renders_f1_certified():
+    """apply_step5_i20 key resolves to text containing 'I-20'."""
+    from src.i18n import t
+    body = t("apply_step5_i20", "EN")
+    assert "I-20" in body
+    assert "SEVIS" in body
+
+
+def test_apply_section_renders_no_f1_warning():
+    """apply_step5_no_f1 key resolves to text warning about F-1 certification."""
+    from src.i18n import t
+    body_en = t("apply_step5_no_f1", "EN")
+    body_pt = t("apply_step5_no_f1", "PT")
+    assert "not F-1 certified" in body_en or "F-1" in body_en
+    assert "F-1" in body_pt
+
+
+def test_cds_admissions_unitid_numeric():
+    """cds_admissions.csv unitid column must be numeric for all non-blank rows."""
+    if not CDS_ADMISSIONS_PATH.exists():
+        pytest.skip("cds_admissions.csv not present")
+    df = pd.read_csv(CDS_ADMISSIONS_PATH)
+    invalid = df[pd.to_numeric(df["unitid"], errors="coerce").isna()]
+    assert invalid.empty, (
+        f"Non-numeric unitid rows: {invalid['unitid'].tolist()}"
+    )

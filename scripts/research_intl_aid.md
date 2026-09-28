@@ -72,6 +72,26 @@ Store as an integer in `cds_total_cost`. This is used as the denominator for `es
 
 > Note: The CDS G section reports the *upcoming* academic year's costs (e.g., CDS 2025-26 reports 2026-27 costs). This is intentional — the CDS is used by prospective students deciding where to apply.
 
+### Step 3b — Section C (application fee) and D (transfer data)
+
+For each school, also extract the following into `data/manual/cds_admissions.csv`:
+
+| Column | CDS location | Notes |
+|--------|-------------|-------|
+| `app_fee` | C2 — "Application fee" | Integer USD; blank if waived/none |
+| `app_fee_waiver` | C2 — "Can it be waived?" | `Yes` / `No` |
+| `rd_deadline` | C1 — "Regular" row, "Deadline" column | Date string as printed (e.g. "Feb 1") |
+| `transfer_applicants` | D — "Number of transfer applicants" | Integer |
+| `transfer_admitted` | D — "Number admitted" | Integer |
+| `transfer_enrolled` | D — "Number enrolled" | Integer |
+| `cds_year` | From document header | e.g. `2025-26` |
+| `source_url` | Same as `source_url` in intl_aid.csv | Direct PDF link |
+
+The `unitid` column uses the same IPEDS unit_id as `intl_aid.csv`.
+
+> **Skip** if the school's CDS PDF is section-only (e.g. only _h or _g sections cached).
+> Leave numeric fields blank rather than zero when the section is absent.
+
 ### Step 4 — International aid policy page
 
 Visit the school's official financial aid website and find the page describing international student aid.

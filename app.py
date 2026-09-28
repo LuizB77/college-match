@@ -18,6 +18,7 @@ from src.matcher import (
     load_data, load_program_earnings, match, explain_exclusion,
     SHOW_COLS, IVY_UNIT_IDS, ADMCON7_LABELS, selectivity_tier,
 )
+from src.i18n import t
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -36,8 +37,10 @@ CIP_PATH      = Path(__file__).parent / "data" / "processed" / "cip_names.csv"
 AID_PATH      = Path(__file__).parent / "data" / "manual" / "intl_aid.csv"
 EARN_PATH     = Path(__file__).parent / "data" / "processed" / "program_earnings.csv"
 ALUMNI_PATH   = Path(__file__).parent / "data" / "processed" / "notable_alumni.csv"
-OPPS_PATH      = Path(__file__).parent / "data" / "manual"    / "opportunities.csv"
-CONTACTS_PATH  = Path(__file__).parent / "data" / "manual"    / "intl_contacts.csv"
+OPPS_PATH           = Path(__file__).parent / "data" / "manual" / "opportunities.csv"
+CONTACTS_PATH       = Path(__file__).parent / "data" / "manual" / "intl_contacts.csv"
+APPLY_COSTS_PATH    = Path(__file__).parent / "data" / "manual" / "apply_costs.csv"
+CDS_ADMISSIONS_PATH = Path(__file__).parent / "data" / "manual" / "cds_admissions.csv"
 SEVP_RAW_DIR   = Path(__file__).parent / "data" / "raw" / "sevp"
 
 # ── Derive data-source dates from actual files ─────────────────────────────────
@@ -345,6 +348,22 @@ def get_intl_aid() -> pd.DataFrame:
     return aid
 
 
+@st.cache_data
+def get_apply_costs():
+    if not APPLY_COSTS_PATH.exists():
+        return pd.DataFrame()
+    return pd.read_csv(APPLY_COSTS_PATH)
+
+
+@st.cache_data
+def get_cds_admissions():
+    if not CDS_ADMISSIONS_PATH.exists():
+        return pd.DataFrame()
+    adm = pd.read_csv(CDS_ADMISSIONS_PATH)
+    adm["unitid"] = pd.to_numeric(adm["unitid"], errors="coerce")
+    return adm
+
+
 df               = get_data(os.path.getmtime(DATA_PATH))
 cip_lookup       = get_cip_lookup()
 intl_aid         = get_intl_aid()
@@ -404,6 +423,9 @@ ALL_SPORTS = sorted({
 ALL_STATES = sorted(df["state"].dropna().unique().tolist())
 
 # ── Session state ──────────────────────────────────────────────────────────────
+if "lang" not in st.session_state:
+    st.session_state["lang"] = "EN"
+
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -832,6 +854,73 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
             st.link_button("Find their international office", search_url)
         st.caption("Ask the international office about scholarships, deadlines, and English test requirements.")
 
+    # ── How to apply from Brazil ──────────────────────────────────────────────
+    _lang = st.session_state.get("lang", "EN")
+    with st.expander(t("apply_heading", _lang)):
+        _apply_costs_df = get_apply_costs()
+        _cds_adm = get_cds_admissions()
+
+        _cds_row = None
+        if not _cds_adm.empty and unit_id is not None:
+            try:
+                _m = _cds_adm[_cds_adm["unitid"] == int(unit_id)]
+                if not _m.empty:
+                    _cds_row = _m.iloc[0]
+            except (TypeError, ValueError):
+                pass
+
+        # Step 1 — Transcripts
+        st.markdown(f"**{t('apply_step1_heading', _lang)}**")
+        st.markdown(t("apply_step1_body", _lang))
+
+        # Step 2 — Tests
+        st.markdown(f"**{t('apply_step2_heading', _lang)}**")
+        st.markdown(t("apply_step2_body", _lang))
+
+        # Step 3 — English proficiency
+        st.markdown(f"**{t('apply_step3_heading', _lang)}**")
+        st.markdown(t("apply_step3_body", _lang))
+
+        # Step 4 — Application (fee + deadline from CDS if known)
+        st.markdown(f"**{t('apply_step4_heading', _lang)}**")
+        if _cds_row is not None:
+            _fee = _cds_row.get("app_fee")
+            _waiver = _cds_row.get("app_fee_waiver")
+            _deadline = _cds_row.get("rd_deadline")
+            _cds_yr = _cds_row.get("cds_year", "")
+            if pd.notna(_fee):
+                st.markdown(t("apply_step4_fee", _lang, fee=int(float(_fee))))
+            else:
+                st.markdown(t("apply_step4_fee_unknown", _lang))
+            if pd.notna(_waiver) and str(_waiver).strip().upper() in ("YES", "TRUE", "Y", "1"):
+                st.caption(t("apply_step4_fee_waiver", _lang))
+            if pd.notna(_deadline) and str(_deadline).strip() not in ("", "nan"):
+                st.markdown(t("apply_step4_deadline", _lang, deadline=str(_deadline).strip()))
+            else:
+                st.markdown(t("apply_step4_deadline_unknown", _lang))
+            _t_app = _cds_row.get("transfer_applicants")
+            _t_adm = _cds_row.get("transfer_admitted")
+            if pd.notna(_t_app) and pd.notna(_t_adm) and float(_t_app) > 0:
+                _rate = float(_t_adm) / float(_t_app)
+                st.caption(t("apply_step4_transfers", _lang,
+                             rate=_rate, admitted=int(float(_t_adm)),
+                             applied=int(float(_t_app)), cds_year=_cds_yr))
+        else:
+            st.markdown(t("apply_step4_fee_unknown", _lang))
+            st.markdown(t("apply_step4_deadline_unknown", _lang))
+
+        # Step 5 — After admission
+        st.markdown(f"**{t('apply_step5_heading', _lang)}**")
+        if row.get("sevp_certified"):
+            st.markdown(t("apply_step5_i20", _lang))
+        else:
+            st.error(t("apply_step5_no_f1", _lang))
+
+        if not _apply_costs_df.empty and "date_checked" in _apply_costs_df.columns:
+            _date_vals = _apply_costs_df["date_checked"].dropna()
+            if not _date_vals.empty:
+                st.caption(t("apply_costs_caption", _lang, date=_date_vals.iloc[0]))
+
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -1050,20 +1139,27 @@ if require_intl_merit and not results.empty:
     else:
         st.warning("Opportunities data not loaded — merit scholarship filter has no effect.")
 
+# ── Language toggle ───────────────────────────────────────────────────────────
+_lang = st.session_state.get("lang", "EN")
+_lang_col, _ = st.columns([1, 11])
+with _lang_col:
+    if st.button(t("lang_switch", _lang), key="lang_toggle_btn"):
+        st.session_state["lang"] = t("lang_switch", _lang)
+        st.rerun()
+
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab_find, tab_alumni, tab_how = st.tabs(["Find schools", "Famous alumni", "How it works"])
+tab_find, tab_alumni, tab_how = st.tabs([
+    t("tab_find", _lang), t("tab_alumni", _lang), t("tab_how", _lang),
+])
 
 # ══════════════════════════════════════════════════════════════════════════════
 # TAB 1 — Find schools
 # ══════════════════════════════════════════════════════════════════════════════
 with tab_find:
 
-    st.title("College Match", anchor=False)
-    st.markdown(
-        "Find U.S. colleges and junior colleges that fit an international student's "
-        "budget, sport, major, and visa needs."
-    )
-    st.caption("Set filters with ›› at the top left of the page.")
+    st.title(t("page_title", _lang), anchor=False)
+    st.markdown(t("page_subtitle", _lang))
+    st.caption(t("set_filters_caption", _lang))
 
     # "Schools that fit" = ranked results after all filters (including post-match)
     schools_that_fit = len(results)
@@ -1071,28 +1167,28 @@ with tab_find:
     mrow1 = st.columns(2)
     mrow2 = st.columns(2)
     with mrow1[0]:
-        st.metric("Schools that fit", schools_that_fit)
+        st.metric(t("metric_schools_fit", _lang), schools_that_fit)
     with mrow1[1]:
         if not results.empty:
             median_cost = results["cost_international"].median()
             st.metric(
-                "Median cost/yr",
+                t("metric_median_cost", _lang),
                 f"${median_cost:,.0f}" if pd.notna(median_cost) else "—",
             )
         else:
-            st.metric("Median cost/yr", "—")
+            st.metric(t("metric_median_cost", _lang), "—")
     with mrow2[0]:
         if client.get("sport") and not results.empty:
             aid_count = results["athletic_aid_tier"].isin(AID_TIERS).sum()
-            st.metric("Athletic scholarships", int(aid_count))
+            st.metric(t("metric_athletic_schol", _lang), int(aid_count))
         else:
-            st.metric("Athletic scholarships", "—")
+            st.metric(t("metric_athletic_schol", _lang), "—")
     with mrow2[1]:
         if not results.empty:
             f1_count = int(results["sevp_certified"].sum())
-            st.metric("F-1 certified", f1_count)
+            st.metric(t("metric_f1_certified", _lang), f1_count)
         else:
-            st.metric("F-1 certified", "—")
+            st.metric(t("metric_f1_certified", _lang), "—")
 
     # ── School lookup ──────────────────────────────────────────────────────────
     school_labels = df["name"] + " (" + df["state"].fillna("?") + ")"
@@ -1154,7 +1250,9 @@ with tab_find:
         else:
             sorted_results = results  # already sorted by match_score
 
-        tab_cards, tab_table, tab_map = st.tabs(["Cards", "Table", "Map"])
+        tab_cards, tab_table, tab_map = st.tabs([
+            t("tab_cards", _lang), t("tab_table", _lang), t("tab_map", _lang),
+        ])
 
         # ── Cards tab ──────────────────────────────────────────────────────────
         with tab_cards:
