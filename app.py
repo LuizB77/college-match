@@ -334,6 +334,8 @@ def get_intl_aid() -> pd.DataFrame:
     aid = aid[pd.to_numeric(aid["unitid"], errors="coerce").notna()].copy()
     aid["unitid"] = aid["unitid"].astype(int)
     aid["avg_intl_award"] = pd.to_numeric(aid["avg_intl_award"], errors="coerce")
+    if "quality" in aid.columns:
+        aid = aid[aid["quality"].isin(["ok", ""])].copy()
     for bool_col in ["offers_intl_aid", "meets_full_need_intl", "need_blind_intl"]:
         if bool_col in aid.columns:
             aid[bool_col] = aid[bool_col].map(
@@ -378,7 +380,10 @@ _famous_school_ids: set = (
 
 if not intl_aid.empty:
     df = df.merge(intl_aid, left_on="unit_id", right_on="unitid", how="left")
-    df["est_net_cost"] = df["cost_international"] - df["avg_intl_award"]
+    # Use CDS total cost when available (more accurate than IPEDS); fall back to IPEDS cost_international
+    _base_cost = df["cds_total_cost"].where(df["cds_total_cost"].notna(), df["cost_international"]) \
+        if "cds_total_cost" in df.columns else df["cost_international"]
+    df["est_net_cost"] = _base_cost - df["avg_intl_award"]
 else:
     df["est_net_cost"]         = float("nan")
     df["offers_intl_aid"]      = None
@@ -489,9 +494,19 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
         cost_oos  = row.get("tuition_out_of_state")
         est_net   = row.get("est_net_cost")
         col1, col2 = st.columns(2)
+        cds_cost  = row.get("cds_total_cost")
+        cds_yr_g  = row.get("cds_year")
         col1.metric("International estimate / yr", f"${cost_intl:,.0f}" if pd.notna(cost_intl) else "—")
         col2.metric("Out-of-state tuition",        f"${cost_oos:,.0f}"  if pd.notna(cost_oos)  else "—")
-        st.caption("Sticker prices before scholarships or financial aid.")
+        if pd.notna(cds_cost) if cds_cost is not None else False:
+            cds_yr_label = f" {cds_yr_g}" if cds_yr_g and str(cds_yr_g) not in ("None", "nan") else ""
+            st.caption(
+                f"Cost{cds_yr_label} (from the school's Common Data Set): "
+                f"${cds_cost:,.0f} tuition + fees + on-campus housing & meals. "
+                "Sticker prices before scholarships or financial aid."
+            )
+        else:
+            st.caption("Sticker prices before scholarships or financial aid.")
 
         # International Aid
         offers_aid = row.get("offers_intl_aid")
