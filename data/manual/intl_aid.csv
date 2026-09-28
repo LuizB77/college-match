@@ -26,7 +26,7 @@ unitid,offers_intl_aid,meets_full_need_intl,need_blind_intl,pct_intl_aided,avg_i
 193900,True,,,,36562.0,,2025-26,https://www.nyu.edu/content/dam/nyu/institutionalResearch/documents/cds-2025-2026/CDS%202025-2026%20FINAL%20(no%20G).pdf,https://www.nyu.edu/admissions/undergraduate-admissions/how-to-apply/financial-aid.html,ok
 164988,True,False,,0.0579,50568.0,87122.0,2024-25,https://www.bu.edu/asir/files/2025/03/cds-2025-h.pdf,https://www.bu.edu/finaid/types-of-aid/grants-scholarships/international/,ok
 123961,True,False,,0.3035,27577.0,87887.0,2025-26,https://oir.usc.edu/wp-content/uploads/sites/3/2026/10/CDS_2025-26_FINAL.pdf,https://financialaid.usc.edu/international-students/,ok
-164748,True,False,,1.0979,1255.0,76920.0,2025-26,https://www.berklee.edu/sites/default/files/2026-02/CDS_2025-2026.pdf,https://www.berklee.edu/admissions/financial-aid,flagged
+164748,True,False,,,1255.0,76920.0,2025-26,https://www.berklee.edu/sites/default/files/2026-02/CDS_2025-2026.pdf,https://www.berklee.edu/admissions/financial-aid,ok
 167358,True,False,,0.1272,24539.0,91337.0,2024-25,https://uds.northeastern.edu/wp-content/uploads/2026/03/CDS-2024-25.pdf,https://financialaid.northeastern.edu/undergraduate/international-students/,ok
 193654,True,,,,,,,,https://www.newschool.edu/financial-aid/international-students/,ok
 140951,True,False,,,,,,,https://www.scad.edu/admission/financial-aid-and-scholarships/scholarships,ok
@@ -43,3 +43,17 @@ unitid,offers_intl_aid,meets_full_need_intl,need_blind_intl,pct_intl_aided,avg_i
 230038,True,,,0.7391,5543.0,25392.0,2025-26,https://assessmentandplanning.byu.edu/0000019d-e4b0-d088-a1dd-eff755a90000/cds-2025-2026-pdf,https://financialaid.byu.edu/types-of-aid/scholarships/,ok
 109651,True,False,,,,,2024-25,https://cms.artcenter.edu/assets/24118/src/ArtCenter-CDS-2024-2025.pdf,https://www.artcenter.edu/admissions/tuition-and-aid/financial-aid/scholarships.html,ok
 168148,True,,,0.2449,83901.0,97152.0,2025-26,https://provost.tufts.edu/institutionalresearch/wp-content/uploads/sites/5/CDS_2025-2026.pdf,https://financialaid.tufts.edu/apply-for-aid/international-students/,ok
+165015,True,,,0.2776,57906.0,94388.0,2025-26,https://www.brandeis.edu/institutional-research/docs/cds-2025-26.pdf,,ok
+117946,True,,,0.5979,4112.0,86485.0,2024-25,https://academics.lmu.edu/media/lmuacademics/strategicplanningacademiceffectiveness/officeofinstitutionalresearch/documents/Legacy-CDS_2024-2025_06112025.pdf,,ok
+227757,True,,,0.2555,79444.0,92684.0,2025-26,https://ideas.rice.edu/wp-content/uploads/2026/07/CDS_2025-26_WEBSITE.pdf,,ok
+179867,True,,,0.037,71003.0,96994.0,2025-26,https://washu.edu/app/uploads/2026/06/2025-2026-WashU-CDS.pdf,,ok
+201645,True,,,0.4733,43200.0,,2025-26,https://case.edu/ir/sites/default/files/2026-02/CDS%202025-26%20Adjusted%20Final.pdf,,ok
+164924,True,,,0.0313,39634.0,92798.0,2024-25,https://www.bc.edu/content/dam/bc1/offices/irp/ir/cds/Boston_College_CDS_2024-2025_Final.pdf,,ok
+221999,True,,,0.2916,79488.0,94274.0,2024-25,https://cdn.vanderbilt.edu/vu-wpfsx/wp-content/uploads/sites/70/2025/11/CDS_2024-2025.xlsx,,ok
+133553,True,,,0.5435,8815.0,59240.0,2023-24,https://erau.edu/institutional-research/common-data-set/2023-2024-daytona-beach,,ok
+164739,True,,,0.4511,21364.0,,2023-24,https://bentleydownloads.s3.amazonaws.com/general/2023-24+Common+Data+Set+(1).pdf,,ok
+162928,True,True,True,,,,,https://oira.jhu.edu/reports-2/,https://apply.jhu.edu/tuition-aid/common-financial-aid-questions/,ok
+131469,True,False,False,,,,2025-26,https://irp.gwu.edu/sites/g/files/zaxdzs6056/files/2026-04/CDS-PDF-2025-2026.pdf,https://financialaid.gwu.edu/policy-international-student-aid,ok
+191241,True,False,False,,,,,,https://www.fordham.edu/undergraduate-admission/international-students/,ok
+164580,True,,,,,,2025-26,https://www.babson.edu/media/babson/assets/rankings/CDS-2025-2026.pdf,https://www.babson.edu/undergraduate/tuition-and-financial-aid/international-students/,ok
+152080,True,True,True,,,,,https://iris.nd.edu/institutional-research/common-data-set-cds/,https://financialaid.nd.edu/apply-or-renew/international-students/,ok
