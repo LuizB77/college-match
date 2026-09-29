@@ -18,7 +18,11 @@ from src.matcher import (
     load_data, load_program_earnings, match, explain_exclusion,
     SHOW_COLS, IVY_UNIT_IDS, ADMCON7_LABELS, selectivity_tier,
 )
-from src.i18n import t
+from src.i18n import (
+    t, feature_label, feature_help,
+    SLIDER_OPTIONS_EN, SLIDER_OPTIONS_PT,
+    _PRESET_KEY, _AFFIL_KEY, _NEED_KEY, _GENDER_KEY, _SORT_KEY, _TIER_BADGE_KEY,
+)
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -103,6 +107,7 @@ WEIGHT_KEYS = [
     "international_community", "open_admission", "small_school",
     "entrepreneurship_program", "program_strength",
 ]
+_FEAT_KEY_SET = set(WEIGHT_KEYS)  # used by split_reasons for fast key lookup
 
 FEATURE_LABELS = {
     "low_cost":                "Low cost",
@@ -128,8 +133,11 @@ FEATURE_HELP = {
     "program_strength":        "Where graduates in the chosen major earn the most, compared to other schools offering it. With no major chosen: graduates' earnings overall.",
 }
 
-SLIDER_OPTIONS = ["Don't care", "A little", "Somewhat", "Important", "Very important", "Top priority"]
-WORD_TO_INT    = {w: i for i, w in enumerate(SLIDER_OPTIONS)}
+SLIDER_OPTIONS = SLIDER_OPTIONS_EN  # canonical EN list; imported from src.i18n
+WORD_TO_INT    = {
+    **{w: i for i, w in enumerate(SLIDER_OPTIONS_EN)},
+    **{w: i for i, w in enumerate(SLIDER_OPTIONS_PT)},
+}
 
 PRESETS = {
     "Balanced": {
@@ -438,22 +446,24 @@ for k in WEIGHT_KEYS:
 def _apply_preset():
     name = st.session_state["preset_select"]
     if name in PRESETS:
+        _opts = SLIDER_OPTIONS_PT if st.session_state.get("lang") == "PT" else SLIDER_OPTIONS_EN
         for k, v in PRESETS[name].items():
-            st.session_state[f"w_{k}"] = SLIDER_OPTIONS[v]
+            st.session_state[f"w_{k}"] = _opts[v]
 
 
 def _clear_filters():
     for k, v in DEFAULTS.items():
         st.session_state[k] = v
+    _opts = SLIDER_OPTIONS_PT if st.session_state.get("lang") == "PT" else SLIDER_OPTIONS_EN
     for k, v in PRESETS["Balanced"].items():
-        st.session_state[f"w_{k}"] = SLIDER_OPTIONS[v]
+        st.session_state[f"w_{k}"] = _opts[v]
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-def split_reasons(raw: str):
+def split_reasons(raw: str, lang: str = "EN"):
     parts = [p.strip() for p in str(raw).split(",", 1)]
-    w1 = FEATURE_LABELS.get(parts[0], parts[0]) if parts else ""
-    w2 = FEATURE_LABELS.get(parts[1], parts[1]) if len(parts) > 1 else ""
+    w1 = feature_label(parts[0], lang) if parts and parts[0] in _FEAT_KEY_SET else (FEATURE_LABELS.get(parts[0], parts[0]) if parts else "")
+    w2 = feature_label(parts[1], lang) if len(parts) > 1 and parts[1] in _FEAT_KEY_SET else (FEATURE_LABELS.get(parts[1], parts[1]) if len(parts) > 1 else "")
     return w1, w2
 
 
@@ -924,70 +934,71 @@ def show_detail(row: pd.Series, selected_gender: str, major_prefixes, need_based
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.button("Clear all filters", use_container_width=True, on_click=_clear_filters)
+    _sl = st.session_state.get("lang", "EN")  # sidebar language shorthand
+    st.button(t("btn_clear_filters", _sl), use_container_width=True, on_click=_clear_filters)
 
-    st.header("Must-haves")
-    st.caption("Schools that fail any of these are removed.")
+    st.header(t("hdr_must_haves", _sl))
+    st.caption(t("cap_must_haves", _sl))
 
     budget_val = st.slider(
-        "Max the family can pay per year",
+        t("lbl_budget", _sl),
         5_000, MAX_BUDGET_SLIDER, step=500, format="$%d",
         key="sb_budget",
     )
     if budget_val >= MAX_BUDGET_SLIDER:
-        st.caption("No limit — schools with unknown costs are included.")
+        st.caption(t("cap_no_limit", _sl))
         max_budget = None
     else:
-        st.caption(f"Budget: ${budget_val:,}/yr")
+        st.caption(t("cap_budget_val", _sl, val=f"{budget_val:,}"))
         max_budget = budget_val
 
     need_based = st.radio(
-        "Would the family likely qualify for need-based aid?",
+        t("lbl_need_based", _sl),
         ["Yes", "No", "Not sure"],
         key="sb_need_based",
         horizontal=True,
-        help=(
-            "'Yes' applies each school's CDS-reported average net cost to the budget filter "
-            "for schools that offer need-based aid to internationals. "
-            "'No' or 'Not sure' always uses sticker price."
-        ),
+        format_func=lambda x: t(_NEED_KEY[x], _sl),
+        help=t("help_need_based", _sl),
     )
     need_based_yes = (need_based == "Yes")
 
     school_types = st.multiselect(
-        "What type of school?", ["2-year", "4-year"],
+        t("lbl_school_types", _sl), ["2-year", "4-year"],
         key="sb_school_types",
     )
-    states      = st.multiselect("Where? (leave empty for anywhere)", ALL_STATES, key="sb_states")
+    states      = st.multiselect(t("lbl_states", _sl), ALL_STATES, key="sb_states")
     city_groups = st.multiselect(
-        "City size? (leave empty for any)", ["City", "Suburb", "Town", "Rural"],
+        t("lbl_city_groups", _sl), ["City", "Suburb", "Town", "Rural"],
         key="sb_city_groups",
     )
 
-    plays_sport = st.toggle("Does the student play a sport?", key="sb_plays_sport")
+    plays_sport = st.toggle(t("lbl_plays_sport", _sl), key="sb_plays_sport")
     if plays_sport:
         sport_choice = st.selectbox(
-            "Sport", ALL_SPORTS,
+            t("lbl_sport", _sl), ALL_SPORTS,
             index=ALL_SPORTS.index(st.session_state["sb_sport"])
                   if st.session_state["sb_sport"] in ALL_SPORTS else 0,
             key="sb_sport",
         )
-        gender            = st.radio("Gender", ["men", "women"], key="sb_gender")
-        needs_scholarship = st.checkbox("Needs an athletic scholarship", key="sb_scholarship")
+        gender = st.radio(
+            t("lbl_gender", _sl), ["men", "women"],
+            key="sb_gender",
+            format_func=lambda x: t(_GENDER_KEY[x], _sl),
+        )
+        needs_scholarship = st.checkbox(t("lbl_scholarship", _sl), key="sb_scholarship")
     else:
         sport_choice      = None
         gender            = st.session_state.get("sb_gender", "men")
         needs_scholarship = False
 
-    major_label = st.selectbox("Intended major", list(MAJOR_OPTIONS.keys()), key="sb_major")
+    major_label = st.selectbox(t("lbl_major", _sl), list(MAJOR_OPTIONS.keys()), key="sb_major")
 
     affil_filter = st.selectbox(
-        "Religious affiliation",
+        t("lbl_religion", _sl),
         ["Any", "Catholic", "Any religious", "Non-religious"],
         key="sb_affil",
-        help="'Any' shows all schools. 'Catholic' = Roman Catholic only. "
-             "'Any religious' = schools with a stated affiliation. "
-             "'Non-religious' = no stated affiliation.",
+        format_func=lambda x: t(_AFFIL_KEY[x], _sl),
+        help=t("help_religion", _sl),
     )
     _affil_map = {
         "Any":           None,
@@ -997,93 +1008,86 @@ with st.sidebar:
     }
     religion_key = _affil_map[affil_filter]
 
-    with st.expander("Advanced"):
+    with st.expander(t("lbl_advanced", _sl)):
         budget_flex = st.slider(
-            "Stretch budget for athletes (scholarships expected)", 1.0, 2.0, step=0.1,
+            t("lbl_budget_flex", _sl), 1.0, 2.0, step=0.1,
             format="%.1f",
             key="sb_budget_flex",
-            help="1.5 = consider schools up to 50% over budget (the athlete may receive aid that closes the gap).",
+            help=t("help_budget_flex", _sl),
         )
         min_grad_4yr = st.slider(
-            "Min grad rate — 4-year", 0, 100, step=5, format="%d%%",
+            t("lbl_min_grad_4yr", _sl), 0, 100, step=5, format="%d%%",
             key="sb_grad_4yr",
-            help="4-year schools below this are excluded. Schools with unknown rates are kept.",
+            help=t("help_min_grad_4yr", _sl),
         )
         min_grad_2yr  = st.slider(
-            "Min grad rate — 2-year", 0, 100, step=5, format="%d%%",
+            t("lbl_min_grad_2yr", _sl), 0, 100, step=5, format="%d%%",
             key="sb_grad_2yr",
         )
         strict_major  = st.checkbox(
-            "Require exact major (don't count general transfer tracks)",
+            t("lbl_strict_major", _sl),
             key="sb_strict_major",
-            help="When checked, 2-year schools must offer the major as an associate degree; "
-                 "a Liberal Arts transfer track no longer qualifies.",
+            help=t("help_strict_major", _sl),
         )
-        require_f1 = st.checkbox("Require F-1 eligibility (SEVP certified)", key="sb_require_f1")
+        require_f1 = st.checkbox(t("lbl_require_f1", _sl), key="sb_require_f1")
         include_online_only = st.checkbox(
-            "Include online-only schools",
+            t("lbl_include_online", _sl),
             key="sb_include_online_only",
-            help=(
-                "Distance-education-only schools (IPEDS flag). "
-                "F-1 students must attend in person, so these are excluded by default."
-            ),
+            help=t("help_include_online", _sl),
         )
 
     hidden_gems = st.toggle(
-        "Hidden gems only",
+        t("lbl_hidden_gems", _sl),
         key="sb_hidden_gems",
-        help=(
-            "Schools with top-quarter graduate outcomes, an admit rate ≥ 30%, "
-            "and no widely-famous alumni (< 60 Wikipedia languages). "
-            "Often excellent schools that families abroad haven't heard of."
-        ),
+        help=t("help_hidden_gems", _sl),
     )
 
     require_intl_merit = st.toggle(
-        "Has international merit scholarships",
+        t("lbl_intl_merit", _sl),
         key="sb_intl_merit",
-        help=(
-            "Only schools we've researched so far with a confirmed merit scholarship "
-            "open to international students. Schools with no research data are excluded."
-        ),
+        help=t("help_intl_merit", _sl),
     )
 
     st.divider()
 
-    st.header("What matters most")
-    st.caption("These don't remove schools; they decide the order of what's left.")
+    st.header(t("hdr_preferences", _sl))
+    st.caption(t("cap_preferences", _sl))
 
     st.selectbox(
-        "Start from a preset", list(PRESETS.keys()),
+        t("lbl_preset", _sl), list(PRESETS.keys()),
         key="preset_select", on_change=_apply_preset,
+        format_func=lambda x: t(_PRESET_KEY[x], _sl),
     )
 
+    _slider_opts = SLIDER_OPTIONS_PT if _sl == "PT" else SLIDER_OPTIONS_EN
     weights = {}
     for k in WEIGHT_KEYS:
-        _label = FEATURE_LABELS[k]
-        _help  = FEATURE_HELP[k]
+        _lbl  = feature_label(k, _sl)
+        _help = feature_help(k, _sl)
         if k == "program_strength" and major_label == "None":
-            _label = "Strong graduate earnings"
-            _help  = "Schools where graduates earn the most overall. With a major selected: earnings for that specific major."
-        word = st.select_slider(_label, options=SLIDER_OPTIONS, key=f"w_{k}", help=_help)
+            _lbl  = t("feature_grad_earnings", _sl)
+            _help = t("feature_help_program_strength", _sl)
+        word = st.select_slider(_lbl, options=_slider_opts, key=f"w_{k}", help=_help)
         weights[k] = WORD_TO_INT[word]
 
     total_weight = sum(weights.values())
     if total_weight == 0:
-        st.caption("All preferences set to 'Don't care' — results are unranked.")
+        st.caption(t("cap_all_dont_care", _sl))
     else:
+        _pref_col = t("chart_preference_col", _sl)
+        _share_col = t("chart_share_col", _sl)
         chart_data = pd.DataFrame([
-            {"Preference": FEATURE_LABELS[k], "Share (%)": round(v / total_weight * 100)}
+            {_pref_col: feature_label(k, _sl), _share_col: round(v / total_weight * 100)}
             for k, v in weights.items() if v > 0
-        ]).sort_values("Share (%)", ascending=False)
+        ]).sort_values(_share_col, ascending=False)
         chart = (
             alt.Chart(chart_data).mark_bar()
             .encode(
-                x=alt.X("Share (%):Q", axis=alt.Axis(title=None, labels=False, ticks=False)),
-                y=alt.Y("Preference:N", sort="-x", axis=alt.Axis(title=None)),
-                tooltip=["Preference", "Share (%)"],
+                x=alt.X(f"{_share_col}:Q", axis=alt.Axis(title=None, labels=False, ticks=False)),
+                y=alt.Y(f"{_pref_col}:N", sort="-x", axis=alt.Axis(title=None)),
+                tooltip=[_pref_col, _share_col],
             )
-            .properties(height=max(60, len(chart_data) * 24), title="What's driving the ranking")
+            .properties(height=max(60, len(chart_data) * 24), title=t("chart_driving_ranking", _sl))
             .configure_axis(grid=False).configure_view(strokeWidth=0)
         )
         st.altair_chart(chart, use_container_width=True)
@@ -1144,7 +1148,15 @@ _lang = st.session_state.get("lang", "EN")
 _lang_col, _ = st.columns([1, 11])
 with _lang_col:
     if st.button(t("lang_switch", _lang), key="lang_toggle_btn"):
-        st.session_state["lang"] = t("lang_switch", _lang)
+        _new_lang = t("lang_switch", _lang)
+        st.session_state["lang"] = _new_lang
+        # Convert all slider weight values to the new language's option strings
+        _src = SLIDER_OPTIONS_PT if _lang == "PT" else SLIDER_OPTIONS_EN
+        _dst = SLIDER_OPTIONS_PT if _new_lang == "PT" else SLIDER_OPTIONS_EN
+        for _wk in WEIGHT_KEYS:
+            _cur = st.session_state.get(f"w_{_wk}")
+            if _cur in _src:
+                st.session_state[f"w_{_wk}"] = _dst[_src.index(_cur)]
         st.rerun()
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
@@ -1194,11 +1206,11 @@ with tab_find:
     school_labels = df["name"] + " (" + df["state"].fillna("?") + ")"
     school_label_to_idx = dict(zip(school_labels, df.index))
     lookup_label = st.selectbox(
-        "Look up any school...",
+        t("lookup_placeholder", _lang),
         options=[""] + school_labels.tolist(),
         index=0,
         label_visibility="collapsed",
-        placeholder="Look up any school...",
+        placeholder=t("lookup_placeholder", _lang),
         key="school_lookup",
     )
     if lookup_label and lookup_label in school_label_to_idx:
@@ -1234,10 +1246,12 @@ with tab_find:
     if results.empty:
         st.info("No schools pass the current filters. Try relaxing budget, grad rate, or sport filters.")
     else:
-        # Sort selector
+        # Sort selector (store EN key, display translated)
+        _sort_opts = ["Best match", "Lowest cost", "Highest graduation rate"]
         sort_option = st.selectbox(
-            "Sort by",
-            ["Best match", "Lowest cost", "Highest graduation rate"],
+            t("sort_label", _lang),
+            _sort_opts,
+            format_func=lambda x: t(_SORT_KEY[x], _lang),
             key="sort_results",
             label_visibility="collapsed",
         )
@@ -1295,98 +1309,98 @@ with tab_find:
                             )
                             display_cost = est if has_est else cost
                             if has_est and _card_full_cover:
-                                cost_text = "**Aid can cover the full cost** for aided students"
+                                cost_text = t("card_aid_full_cover", _lang)
                             elif pd.notna(display_cost):
-                                cost_text = f"**{money(display_cost)}** per year"
+                                cost_text = f"**{money(display_cost)}** {t('card_per_year', _lang)}"
                             else:
-                                cost_text = "**Cost unknown**"
+                                cost_text = t("card_cost_unknown", _lang)
                             st.markdown(cost_text)
                             # Aid odds — always shown when data exists
                             if _pct_known:
-                                _avg_str = f" · avg {money(_card_avg)}" if pd.notna(_card_avg) else ""
+                                _avg_str = f" · {t('card_avg_award', _lang, amt=money(_card_avg))}" if pd.notna(_card_avg) else ""
                                 if has_est and not _card_full_cover:
-                                    st.caption(f"Est. cost if aided · {_card_pct:.0%} of internationals receive aid{_avg_str}")
+                                    st.caption(t("card_est_cost_aided", _lang, pct=_card_pct) + _avg_str)
                                 elif has_est and _card_full_cover:
-                                    st.caption(f"{_card_pct:.0%} of internationals receive aid")
+                                    st.caption(t("card_aid_full_cover_pct", _lang, pct=_card_pct))
                                 elif need_based_yes and not _pct_common:
-                                    st.caption(f"Aid is rare here: only {_card_pct:.0%} of internationals receive it")
+                                    st.caption(t("card_aid_rare", _lang, pct=_card_pct))
                                 else:
-                                    st.markdown(f"{_card_pct:.0%} of internationals receive aid{_avg_str}")
+                                    st.markdown(t("card_aid_pct_avg", _lang, pct=_card_pct) + _avg_str)
                             elif has_est:
-                                st.caption("Estimated cost if aided · aid share unknown")
+                                st.caption(t("card_est_aided_unknown_pct", _lang))
                             else:
-                                st.caption("sticker price before scholarships")
+                                st.caption(t("card_sticker_price", _lang))
 
                             score = float(row.get("match_score") or 50.0)
                             score = max(0.0, min(100.0, score)) if score == score else 50.0
-                            st.progress(score / 100, text=f"Match score: {score:.1f} / 100")
+                            st.progress(score / 100, text=t("card_match_score", _lang, score=score))
 
                             badges = []
                             if row.get("sevp_certified"):
-                                badges.append(("F-1 certified", "green"))
+                                badges.append((t("badge_f1_yes", _lang), "green"))
                             else:
-                                badges.append(("Not F-1 certified", "red"))
+                                badges.append((t("badge_f1_no", _lang), "red"))
                             if row.get("online_only") == 1 or row.get("online_only") == 1.0:
-                                badges.append(("Online only", "orange"))
+                                badges.append((t("badge_online", _lang), "orange"))
                             row_affil = affil_label(row.get("religious_affil"))
                             if row_affil:
                                 badges.append((row_affil, "gray"))
                             _badge_pct = row.get("pct_intl_aided")
                             if row.get("offers_intl_aid") is True:
                                 if pd.notna(_badge_pct) and _badge_pct >= 0.5:
-                                    badges.append(("Aid for most internationals", "blue"))
+                                    badges.append((t("badge_aid_most", _lang), "blue"))
                                 else:
-                                    badges.append(("Intl aid", "blue"))
+                                    badges.append((t("badge_intl_aid", _lang), "blue"))
                             elif row.get("offers_intl_aid") is False:
-                                badges.append(("No aid for internationals", "red"))
+                                badges.append((t("badge_no_intl_aid", _lang), "red"))
                             if row.get("athletic_aid_tier") in AID_TIERS:
-                                badges.append(("Athletic aid", "blue"))
+                                badges.append((t("badge_athletic_aid", _lang), "blue"))
                             if row.get("offers_entrepreneurship"):
-                                badges.append(("Entrepreneurship", "orange"))
+                                badges.append((t("badge_entrepreneur", _lang), "orange"))
                             if row.get("school_type") == "2-year" and row.get("has_transfer_track"):
-                                badges.append(("Transfer track", "violet"))
+                                badges.append((t("badge_transfer", _lang), "violet"))
                             # Selectivity badge (skip when admit rate is unknown)
                             tier = row.get("selectivity_tier") or selectivity_tier(row.get("admit_rate"))
                             if tier != "Unknown":
                                 tier_color = {"Reach": "red", "Target": "orange", "Likely": "green"}[tier]
-                                badges.append((tier, tier_color))
+                                badges.append((t(_TIER_BADGE_KEY[tier], _lang), tier_color))
                             # Ivy League badge
                             if row.get("ivy_league") or row.get("unit_id") in IVY_UNIT_IDS:
-                                badges.append(("Ivy League", "violet"))
+                                badges.append((t("badge_ivy", _lang), "violet"))
                             # Notable alumni badge (≥20 Wikipedia languages)
                             if int(row.get("unit_id") or 0) in _famous_school_ids:
-                                badges.append(("Notable alumni", "violet"))
+                                badges.append((t("badge_notable", _lang), "violet"))
                             # Opportunities badges
                             _uid_int = int(row.get("unit_id") or 0)
                             if _uid_int in _opp_merit_ids:
-                                badges.append(("Intl merit scholarship", "green"))
+                                badges.append((t("badge_merit_schol", _lang), "green"))
                             if _uid_int in _opp_comp_ids:
-                                badges.append(("Pitch competitions", "orange"))
+                                badges.append((t("badge_pitch", _lang), "orange"))
                             st.markdown(" ".join(f":{c}-badge[{l}]" for l, c in badges))
 
-                            w1, w2 = split_reasons(row["top_reasons"])
+                            w1, w2 = split_reasons(row["top_reasons"], _lang)
                             if major_label == "None":
+                                _grad_earn = t("feature_grad_earnings", _lang)
                                 if w1 == FEATURE_LABELS["program_strength"]:
-                                    w1 = "Strong graduate earnings"
+                                    w1 = _grad_earn
                                 if w2 == FEATURE_LABELS["program_strength"]:
-                                    w2 = "Strong graduate earnings"
-                            st.caption(f"Why: {' · '.join(filter(None, [w1, w2]))}")
+                                    w2 = _grad_earn
+                            st.caption(t("card_why", _lang, reasons=" · ".join(filter(None, [w1, w2]))))
 
-                            if st.button("Details", key=f"det_{rank}", use_container_width=True):
+                            if st.button(t("card_details_btn", _lang), key=f"det_{rank}", use_container_width=True):
                                 show_detail(df.loc[original_idx], gender, client.get("majors"), need_based_yes)
 
             total_results = len(sorted_results)
             if n_shown < total_results:
                 remaining = total_results - n_shown
-                label = f"Show 12 more ({remaining} remaining)"
-                if st.button(label, key=f"show_more_{_client_key}"):
+                if st.button(t("card_show_more", _lang, n=12, rem=remaining), key=f"show_more_{_client_key}"):
                     st.session_state[counter_key] = n_shown + 12
                     st.rerun()
 
             # Compare (inside cards tab)
-            st.subheader("Compare schools", anchor=False)
+            st.subheader(t("card_compare_heading", _lang), anchor=False)
             compare_names = st.multiselect(
-                "Select up to 3 schools to compare side by side",
+                t("card_compare_select", _lang),
                 options=sorted_results["name"].tolist(),
                 max_selections=3,
             )
