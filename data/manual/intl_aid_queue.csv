@@ -118,36 +118,36 @@ unit_id,school_name,priority_group,status,attempted_date,notes
 212674,Gettysburg College,2,filled,2026-09-30,H6 326 aided (B2=289 mismatch); avg $60k; G1 85640; CDS 2024-25; pct omitted
 488679,Indiana Wesleyan University-National & Global,2,policy_only,2026-09-30,Min $10k gift aid for internationals; CSS Profile accepted
 147536,National Louis University,2,policy_only,2026-09-30,10% tuition scholarship + Fresh Start rate; auto-awarded to intl students
-199962,Wingate University,2,pending,,
+199962,Wingate University,2,policy_only,2026-09-30,Merit $15k-$30.5k; additional need-based via form; no CDS found
 228246,Southern Methodist University,2,filled,2026-09-30,
 204501,Oberlin College,2,filled,2026-09-30,
 212009,Dickinson College,2,policy_only,2026-09-30,
-131113,Wilmington University,2,pending,,
-161086,Colby College,2,pending,,
-461795,North American University,2,pending,,
-399911,Soka University of America,2,pending,,
-156365,Campbellsville University,2,pending,,
-177968,Lindenwood University,2,pending,,
-104586,Embry-Riddle Aeronautical University-Prescott,2,pending,,
-235316,Gonzaga University,2,pending,,
+131113,Wilmington University,2,policy_only,2026-09-30,International Student Scholarship available; no CDS found
+161086,Colby College,2,policy_only,2026-09-30,Meets 100% need; need-aware; no recent CDS PDF found
+461795,North American University,2,policy_only,2026-09-30,Merit scholarships up to $22k; no CDS found
+399911,Soka University of America,2,policy_only,2026-09-30,Need-based aid for internationals; Box PDF blocked
+156365,Campbellsville University,2,policy_only,2026-09-30,Merit scholarships; no CDS found
+177968,Lindenwood University,2,policy_only,2026-09-30,$40M institutional aid; no CDS accessible
+104586,Embry-Riddle Aeronautical University-Prescott,2,policy_only,2026-09-30,Merit scholarships; CDS only to 2022-23 (too old)
+235316,Gonzaga University,2,policy_only,2026-09-30,Merit $23.5k-$32k/yr; CDS blocked by Cloudflare
 190099,Colgate University,2,policy_only,2026-09-30,
-168740,Andrews University,2,pending,,
+168740,Andrews University,2,policy_only,2026-09-30,$14k Andrews Partnership Scholarship; no CDS found
 146719,Loyola University Chicago,2,filled,2026-09-30,
-192448,Long Island University,2,pending,,
-206589,The College of Wooster,2,pending,,
-110097,Biola University,2,pending,,
+192448,Long Island University,2,policy_only,2026-09-30,Merit scholarships; no CDS found
+206589,The College of Wooster,2,policy_only,2026-09-30,Meets 100% institutionally determined need; need-aware; CDS on SharePoint
+110097,Biola University,2,policy_only,2026-09-30,Need-based grants $500-$2k; CDS on Google Sheets
 174914,University of St Thomas,2,policy_only,2026-09-30,
-151263,University of Indianapolis,2,pending,,
-121345,Pomona College,2,pending,,
-120403,Otis College of Art and Design,2,pending,,
-163295,Maryland Institute College of Art,2,pending,,
-188429,Adelphi University,2,pending,,
-120883,University of the Pacific,2,pending,,
-215655,Robert Morris University,2,pending,,
+151263,University of Indianapolis,2,policy_only,2026-09-30,Merit $12k-$20k; no need-based; CDS behind SSO
+121345,Pomona College,2,policy_only,2026-09-30,Meets full need; need-aware; CDS on Tableau only
+120403,Otis College of Art and Design,2,filled,2026-09-30,H6 207 aided; avg $16k; G1 78430; CDS 2024-25; pct_intl_aided omitted (>1)
+163295,Maryland Institute College of Art,2,policy_only,2026-09-30,Need-based via CSS Profile + merit; no CDS found
+188429,Adelphi University,2,policy_only,2026-09-30,Merit scholarships; CDS last available 2022-23 (too old)
+120883,University of the Pacific,2,policy_only,2026-09-30,CDS 2025-26 H6=N/A; merit scholarships only for internationals
+215655,Robert Morris University,2,policy_only,2026-09-30,Merit $11k-$28k; no CDS accessible
 147679,North Park University,2,pending,,
 111081,California Institute of the Arts,2,pending,,
-237057,Whitman College,2,pending,,
-111948,Chapman University,2,pending,,
+237057,Whitman College,2,filled,2026-09-30,H6 201/211 aided; avg $52k; G1 not published; CDS 2024-25; meets full need; need-aware
+111948,Chapman University,2,filled,2026-09-30,H6 182/226 aided; avg $24k; G1 89294; CDS 2025-26
 219000,Augustana University,2,pending,,
 196866,Union College,2,pending,,
 173258,Carleton College,2,pending,,
