@@ -1204,3 +1204,108 @@ def test_cds_admissions_unitid_numeric():
     assert invalid.empty, (
         f"Non-numeric unitid rows: {invalid['unitid'].tolist()}"
     )
+
+
+# ---------------------------------------------------------------------------
+# CDS extractor smoke tests
+# ---------------------------------------------------------------------------
+
+def _load_gt():
+    import csv
+    gt = {}
+    gt_path = ROOT / "data/manual/intl_aid.csv"
+    if not gt_path.exists():
+        return gt
+    with open(gt_path) as f:
+        for row in csv.DictReader(f):
+            gt[row["unitid"]] = row
+    return gt
+
+
+@pytest.fixture(scope="session")
+def gt():
+    return _load_gt()
+
+
+def _tol(extracted, expected, pct=0.02):
+    """True if extracted is within pct% of expected."""
+    if extracted is None or expected is None:
+        return False
+    return abs(extracted - expected) / abs(expected) <= pct
+
+
+@pytest.mark.skipif(
+    not (ROOT / "data/cds_cache").exists(),
+    reason="data/cds_cache directory not present",
+)
+class TestCDSExtractor:
+    def _extract(self, uid):
+        from scripts.extract_cds import extract_school
+        return extract_school(str(uid))
+
+    def test_harvard_h6(self, gt):
+        r = self._extract(166027)
+        g = gt.get("166027", {})
+        gt_avg = float(g["avg_intl_award"]) if g.get("avg_intl_award") else None
+        assert r.get("avg_award") is not None, "Harvard avg_award missing"
+        assert _tol(r["avg_award"], gt_avg), (
+            f"Harvard avg_award {r['avg_award']} not within 2% of GT {gt_avg}"
+        )
+        gt_pct = float(g["pct_intl_aided"]) if g.get("pct_intl_aided") else None
+        if gt_pct is not None:
+            assert _tol(r.get("pct_intl_aided"), gt_pct), (
+                f"Harvard pct {r.get('pct_intl_aided')} not within 2% of GT {gt_pct}"
+            )
+
+    def test_yale_h6(self, gt):
+        cache = ROOT / "data/cds_cache"
+        if not any(cache.glob("yale_*")):
+            pytest.skip("Yale PDF not cached")
+        r = self._extract(130794)
+        g = gt.get("130794", {})
+        gt_avg = float(g["avg_intl_award"]) if g.get("avg_intl_award") else None
+        assert _tol(r.get("avg_award"), gt_avg), (
+            f"Yale avg_award {r.get('avg_award')} not within 2% of GT {gt_avg}"
+        )
+        gt_pct = float(g["pct_intl_aided"]) if g.get("pct_intl_aided") else None
+        if gt_pct is not None:
+            assert _tol(r.get("pct_intl_aided"), gt_pct), (
+                f"Yale pct {r.get('pct_intl_aided')} not within 2% of GT {gt_pct}"
+            )
+
+    def test_mit_graceful(self):
+        """MIT has no cached PDF — extractor must return a dict without crashing."""
+        r = self._extract(166683)
+        assert isinstance(r, dict)
+
+    def test_duke_h6(self, gt):
+        cache = ROOT / "data/cds_cache"
+        if not any(cache.glob("duke_*")):
+            pytest.skip("Duke PDF not cached")
+        r = self._extract(198419)
+        g = gt.get("198419", {})
+        gt_avg = float(g["avg_intl_award"]) if g.get("avg_intl_award") else None
+        assert _tol(r.get("avg_award"), gt_avg), (
+            f"Duke avg_award {r.get('avg_award')} not within 2% of GT {gt_avg}"
+        )
+        gt_pct = float(g["pct_intl_aided"]) if g.get("pct_intl_aided") else None
+        if gt_pct is not None:
+            assert _tol(r.get("pct_intl_aided"), gt_pct), (
+                f"Duke pct {r.get('pct_intl_aided')} not within 2% of GT {gt_pct}"
+            )
+
+    def test_columbia_h6(self, gt):
+        cache = ROOT / "data/cds_cache"
+        if not any(cache.glob("columbia_*")):
+            pytest.skip("Columbia PDF not cached")
+        r = self._extract(190150)
+        g = gt.get("190150", {})
+        gt_avg = float(g["avg_intl_award"]) if g.get("avg_intl_award") else None
+        assert _tol(r.get("avg_award"), gt_avg), (
+            f"Columbia avg_award {r.get('avg_award')} not within 2% of GT {gt_avg}"
+        )
+        gt_pct = float(g["pct_intl_aided"]) if g.get("pct_intl_aided") else None
+        if gt_pct is not None:
+            assert _tol(r.get("pct_intl_aided"), gt_pct), (
+                f"Columbia pct {r.get('pct_intl_aided')} not within 2% of GT {gt_pct}"
+            )
