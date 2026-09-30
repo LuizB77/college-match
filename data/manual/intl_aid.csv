@@ -117,3 +117,9 @@ unitid,offers_intl_aid,meets_full_need_intl,need_blind_intl,pct_intl_aided,avg_i
 488679,True,,,,,,,,https://www.indwes.edu/admissions/tuition-aid/aid-options,ok
 147536,True,,,,,,,,https://nl.edu/admissions/international-students/affordable-tuition-and-scholarships/,ok
 236595,True,,,,,,,,https://www.seattleu.edu/financial-aid/receiving-financial-aid/international-student-financial-aid/,ok
+146719,True,,,0.8842,26906.0,76490.0,2025-26,https://www.luc.edu/media/lucedu/oie/CDS%202025-26%20-%20Loyola%20University%20Chicago%20-%20Final_af.pdf,https://www.luc.edu/finaid/international/,ok
+204501,True,,,1.0,49193.0,90461.0,2024-25,https://www.oberlin.edu/institutional-research/common-data-set,https://www.oberlin.edu/admissions-and-aid/financial-aid/international-students,ok
+228246,True,False,,,45354.0,92766.0,2025-26,https://www.smu.edu/about/leadership-and-administration/institutional-effectiveness/common-data-set/cds-2025-26-part-h-financial-aid.pdf,https://www.smu.edu/enrollment-services/financial-aid/types-of-aid/scholarships/international-scholarships,ok
+190099,True,True,False,,,,,,https://www.colgate.edu/admission-aid/financial-aid/colgate-commitment,ok
+212009,True,,False,,,,,,https://www.dickinson.edu/info/20045/admissions/1179/international_student_financial_aid,ok
+174914,True,,,,,,,,https://www.stthomas.edu/admissions/international/undergraduate/merit-based-scholarships/,ok
