@@ -51,7 +51,9 @@ echo "--- Step 3: pytest (skips = failures) ---"
 cd "$REPO_DIR"
 
 PYTEST_OUT="$TMPDIR_BASE/pytest.txt"
-"$VENV_DIR/bin/python" -m pytest tests/ -v 2>&1 | tee "$PYTEST_OUT"
+# Exclude local_data tests — they require data/cds_cache which is not in git.
+# Skips are still treated as failures for everything else.
+"$VENV_DIR/bin/python" -m pytest tests/ -v -m "not local_data" 2>&1 | tee "$PYTEST_OUT"
 PYTEST_EXIT=${PIPESTATUS[0]}
 
 # Fail if any test was skipped — a skip in the deploy environment means a
