@@ -98,26 +98,26 @@ unit_id,school_name,priority_group,status,attempted_date,notes
 167835,Smith College,2,filled,2026-09-30,H6 164/349 aided; avg $83k; CDS 2024-25; B2 snippet; G1 not published
 136774,Ringling College of Art and Design,2,policy_only,2026-09-30,Merit scholarships for internationals confirmed
 189088,Bard College,2,policy_only,2026-09-30,Meets full demonstrated need; BISFAA required; CDS not extracted
-230959,Middlebury College,2,pending,,
-195809,St. John's University-New York,2,pending,,
-174844,St Olaf College,2,pending,,
-137476,St. Thomas University,2,pending,,
-233374,University of Richmond,2,pending,,
-199847,Wake Forest University,2,pending,,
-110370,California College of the Arts,2,pending,,
-173902,Macalester College,2,pending,,
-184603,Fairleigh Dickinson University-Metropolitan Campus,2,pending,,
-168218,Wellesley College,2,pending,,
-212577,Franklin and Marshall College,2,pending,,
-130697,Wesleyan University,2,pending,,
-146427,Knox College,2,pending,,
-132471,Barry University,2,pending,,
-130590,Trinity College,2,pending,,
-236595,Seattle University,2,pending,,
-194091,New York Institute of Technology,2,pending,,
-212674,Gettysburg College,2,pending,,
-488679,Indiana Wesleyan University-National & Global,2,pending,,
-147536,National Louis University,2,pending,,
+230959,Middlebury College,2,filled,2026-09-30,H6 192/337 aided; avg $79k; G1 not published; CDS 2024-25; meets full need
+195809,St. John's University-New York,2,policy_only,2026-09-30,Merit + need-based scholarships offered; CDS not publicly found
+174844,St Olaf College,2,policy_only,2026-09-30,H6 blank in CDS 2025-26; limited institutional aid; G1=81200
+137476,St. Thomas University,2,policy_only,2026-09-30,Merit scholarships $9k-$13k/yr by GPA; no need-based
+233374,University of Richmond,2,filled,2026-09-30,H6 187/287 aided; avg $68k; G1 89540; CDS 2025-26; meets full need; need-aware
+199847,Wake Forest University,2,policy_only,2026-09-30,H6 blank; merit-only for internationals; no need-based aid
+110370,California College of the Arts,2,policy_only,2026-09-30,Merit scholarships $20k-$25k; no need-based for internationals
+173902,Macalester College,2,policy_only,2026-09-30,H6 blank in CDS 2025-26; meets full need confirmed via policy page
+184603,Fairleigh Dickinson University-Metropolitan Campus,2,policy_only,2026-09-30,Merit scholarships up to $24k/yr; no need-based
+168218,Wellesley College,2,filled,2026-09-30,H6 avg $94k; total/avg=71 aided; B2=292; CDS 2025-26; meets full need; need-aware
+212577,Franklin and Marshall College,2,filled,2026-09-30,H6 152/305 aided; avg $59k; G1 77220; CDS 2024-25; meets full need
+130697,Wesleyan University,2,filled,2026-09-30,H6 84/311 aided; avg $83k; G1 86350; CDS 2022-23; need-blind; meets full need
+146427,Knox College,2,filled,2026-09-30,H6 323/323 aided; avg $47k; G1 74757; CDS 2025-26; merit-only
+132471,Barry University,2,policy_only,2026-09-30,Merit scholarships available; no need-based
+130590,Trinity College,2,filled,2026-09-30,H6 245/295 aided; avg $66k; G1 93240; CDS 2024-25; meets full need
+236595,Seattle University,2,policy_only,2026-09-30,Merit ≥$8k/yr auto-awarded; no need-based for internationals
+194091,New York Institute of Technology,2,policy_only,2026-09-30,International Leadership Scholarship + merit awards; auto-considered
+212674,Gettysburg College,2,filled,2026-09-30,H6 326 aided (B2=289 mismatch); avg $60k; G1 85640; CDS 2024-25; pct omitted
+488679,Indiana Wesleyan University-National & Global,2,policy_only,2026-09-30,Min $10k gift aid for internationals; CSS Profile accepted
+147536,National Louis University,2,policy_only,2026-09-30,10% tuition scholarship + Fresh Start rate; auto-awarded to intl students
 199962,Wingate University,2,pending,,
 228246,Southern Methodist University,2,pending,,
 204501,Oberlin College,2,pending,,
