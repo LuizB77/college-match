@@ -78,26 +78,26 @@ unit_id,school_name,priority_group,status,attempted_date,notes
 212601,Gannon University,2,policy_only,2026-09-28,CDS not found; international award confirmed
 166939,Mount Holyoke College,2,filled,2026-09-28,"H6 257/417, avg $53,460, G1 $93,046"
 132657,Lynn University,2,policy_only,2026-09-28,CDS download blocked; merit scholarships $16k-$28k confirmed
-133881,Florida Institute of Technology,2,pending,,
-202523,Denison University,2,pending,,
-232557,Liberty University,2,pending,,
-178369,Missouri Valley College,2,pending,,
-194824,Rensselaer Polytechnic Institute,2,pending,,
-179894,Webster University,2,pending,,
-223232,Baylor University,2,pending,,
-213543,Lehigh University,2,pending,,
-131159,American University,2,pending,,
-160755,Tulane University of Louisiana,2,pending,,
-145725,Illinois Institute of Technology,2,pending,,
-137032,Saint Leo University,2,pending,,
-153384,Grinnell College,2,pending,,
-122436,University of San Diego,2,pending,,
-179159,Saint Louis University,2,pending,,
-183910,Caldwell University,2,pending,,
-168421,Worcester Polytechnic Institute,2,pending,,
-167835,Smith College,2,pending,,
-136774,Ringling College of Art and Design,2,pending,,
-189088,Bard College,2,pending,,
+133881,Florida Institute of Technology,2,policy_only,2026-09-30,CDS PDF inaccessible (HTML returned); merit scholarships confirmed
+202523,Denison University,2,filled,2026-09-30,H6 358/382 aided; avg $55k; G1 92400; CDS 2025-26
+232557,Liberty University,2,policy_only,2026-09-30,Institutional aid offered per eligibility form; no CDS H6 extracted
+178369,Missouri Valley College,2,policy_only,2026-09-30,Institutional scholarships confirmed; CDS not located
+194824,Rensselaer Polytechnic Institute,2,policy_only,2026-09-30,Merit up to $25k; CDS on Box cloud — not downloadable
+179894,Webster University,2,policy_only,2026-09-30,Merit $12k-$20k auto-awarded; CDS not located
+223232,Baylor University,2,filled,2026-09-30,H6 340/406 aided; avg $36k; G1 84978; CDS 2025-26
+213543,Lehigh University,2,policy_only,2026-09-30,H6 blank in CDS 2024-25 and 2025-26 PDFs
+131159,American University,2,policy_only,2026-09-30,H6 blank in CDS; merit-only $8k-$25k confirmed
+160755,Tulane University of Louisiana,2,policy_only,2026-09-30,CDS on Box cloud — not downloadable; need-based + merit confirmed
+145725,Illinois Institute of Technology,2,filled,2026-09-30,H6 392/414 aided; avg $25k; CDS 2023-24; no G1 published
+137032,Saint Leo University,2,policy_only,2026-09-30,$3k/yr Global Citizen Award; CDS not extracted
+153384,Grinnell College,2,filled,2026-09-30,H6 243/363 aided; avg $57k; G1 89247; CDS 2024-25; B2 snippet
+122436,University of San Diego,2,filled,2026-09-30,H6 63/337 aided; avg $19k; G1 84399; CDS 2025-26; all snippet fallback
+179159,Saint Louis University,2,policy_only,2026-09-30,Merit auto-awarded; CDS not publicly accessible
+183910,Caldwell University,2,policy_only,2026-09-30,Merit $20k-$27k; CDS not extracted
+168421,Worcester Polytechnic Institute,2,filled,2026-09-30,H6 325/338 aided; avg $27k; G1 84690; CDS 2025-26
+167835,Smith College,2,filled,2026-09-30,H6 164/349 aided; avg $83k; CDS 2024-25; B2 snippet; G1 not published
+136774,Ringling College of Art and Design,2,policy_only,2026-09-30,Merit scholarships for internationals confirmed
+189088,Bard College,2,policy_only,2026-09-30,Meets full demonstrated need; BISFAA required; CDS not extracted
 230959,Middlebury College,2,pending,,
 195809,St. John's University-New York,2,pending,,
 174844,St Olaf College,2,pending,,
