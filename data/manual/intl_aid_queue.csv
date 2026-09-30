@@ -144,28 +144,28 @@ unit_id,school_name,priority_group,status,attempted_date,notes
 188429,Adelphi University,2,policy_only,2026-09-30,Merit scholarships; CDS last available 2022-23 (too old)
 120883,University of the Pacific,2,policy_only,2026-09-30,CDS 2025-26 H6=N/A; merit scholarships only for internationals
 215655,Robert Morris University,2,policy_only,2026-09-30,Merit $11k-$28k; no CDS accessible
-147679,North Park University,2,pending,,
-111081,California Institute of the Arts,2,pending,,
+147679,North Park University,2,policy_only,2026-09-30,offers_intl_aid=TRUE intl grants + academic scholarships
+111081,California Institute of the Arts,2,policy_only,2026-09-30,offers_intl_aid=TRUE merit scholarships + access grants
 237057,Whitman College,2,filled,2026-09-30,H6 201/211 aided; avg $52k; G1 not published; CDS 2024-25; meets full need; need-aware
 111948,Chapman University,2,filled,2026-09-30,H6 182/226 aided; avg $24k; G1 89294; CDS 2025-26
-219000,Augustana University,2,pending,,
-196866,Union College,2,pending,,
-173258,Carleton College,2,pending,,
-221892,Trevecca Nazarene University,2,pending,,
-216287,Swarthmore College,2,pending,,
-202480,University of Dayton,2,pending,,
-221661,Southern Adventist University,2,pending,,
-144281,Columbia College Chicago,2,pending,,
-203535,Kenyon College,2,pending,,
-232706,Marymount University,2,pending,,
-107558,University of the Ozarks,2,pending,,
-191649,Hofstra University,2,pending,,
-195216,St Lawrence University,2,pending,,
-136950,Rollins College,2,pending,,
-112260,Claremont McKenna College,2,pending,,
-153834,Luther College,2,pending,,
-137546,Stetson University,2,pending,,
-232609,University of Lynchburg,2,pending,,
+219000,Augustana University,2,filled,2026-09-30,"H6: 242/246 aided, avg=$27,797; G1=$53,522"
+196866,Union College,2,policy_only,2026-09-30,garbled CDS PDF; offers_intl_aid=TRUE
+173258,Carleton College,2,policy_only,2026-09-30,blank CDS PDF; offers_intl_aid=TRUE limited
+221892,Trevecca Nazarene University,2,policy_only,2026-09-30,offers_intl_aid=TRUE scholarships to 99% of students
+216287,Swarthmore College,2,policy_only,2026-09-30,blank CDS PDF; offers_intl_aid=TRUE from FA page
+202480,University of Dayton,2,policy_only,2026-09-30,offers_intl_aid=TRUE merit scholarships up to $34k
+221661,Southern Adventist University,2,policy_only,2026-09-30,offers_intl_aid=TRUE institutional scholarships
+144281,Columbia College Chicago,2,filled,2026-09-30,"H6: 178/209 aided, avg=$10,942; G1=$56,856"
+203535,Kenyon College,2,filled,2026-09-30,"H6: 160/212 aided, avg=$67,659; G1=$89,600"
+232706,Marymount University,2,policy_only,2026-09-30,offers_intl_aid=TRUE merit scholarships up to $16k
+107558,University of the Ozarks,2,policy_only,2026-09-30,offers_intl_aid=TRUE need-based grants via IFNA
+191649,Hofstra University,2,policy_only,2026-09-30,CDS on Issuu; offers_intl_aid=TRUE merit scholarships
+195216,St Lawrence University,2,policy_only,2026-09-30,CDS on SharePoint; offers_intl_aid=TRUE merit+need
+136950,Rollins College,2,policy_only,2026-09-30,CDS on SharePoint; offers_intl_aid=TRUE need-based
+112260,Claremont McKenna College,2,filled,2026-09-30,"H6: 53/186 aided, avg=$64,997; meets 100% need"
+153834,Luther College,2,policy_only,2026-09-30,offers_intl_aid=TRUE; 100% intl received aid in 2025
+137546,Stetson University,2,policy_only,2026-09-30,blank CDS PDF; offers_intl_aid=TRUE merit scholarships
+232609,University of Lynchburg,2,policy_only,2026-09-30,offers_intl_aid=TRUE merit scholarships auto-awarded
 198385,Davidson College,2,pending,,
 195526,Skidmore College,2,pending,,
 225575,Huston-Tillotson University,2,pending,,
