@@ -90,6 +90,9 @@ def test_majors_are_lists(schools_json):
             assert "cip4" in entry, (
                 f"School {school['unit_id']}: associate_majors entry missing cip4 key"
             )
+            assert "name" in entry, (
+                f"School {school['unit_id']}: associate_majors entry missing name key"
+            )
 
 
 def test_json_serializable(schools_json):

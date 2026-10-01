@@ -114,10 +114,18 @@ def _build_bachelor_majors(val, cip_names: dict[int, str]) -> list[dict]:
     return result
 
 
-def _build_associate_majors(val) -> list[dict]:
-    """Convert semicolon-separated CIP codes to [{cip4}] list."""
+def _build_associate_majors(val, cip_names: dict[int, str]) -> list[dict]:
+    """Convert semicolon-separated CIP codes to [{cip4, name}] list."""
     cips = _split_cips(val)
-    return [{"cip4": c} for c in cips]
+    result = []
+    for c in cips:
+        try:
+            key = int(c)
+            name = cip_names.get(key, None)
+        except (ValueError, TypeError):
+            name = None
+        result.append({"cip4": c, "name": name})
+    return result
 
 
 def load_top_alumni() -> dict[int, dict]:
@@ -220,6 +228,7 @@ def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
             },
             "athletics": {
                 "division": _nan_to_none(s["division"]),
+                "division_other": _nan_to_none(s["division_other"]),
                 "association": _nan_to_none(s["association"]),
                 "athletic_aid_tier": _nan_to_none(s["athletic_aid_tier"]),
                 "aid_per_athlete_men": _nan_to_none(s["aid_per_athlete_men"]),
@@ -238,7 +247,7 @@ def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
             "academics": {
                 "grad_rate": _nan_to_none(s["grad_rate"]),
                 "bachelor_majors": _build_bachelor_majors(s["bachelor_cips"], cip_names),
-                "associate_majors": _build_associate_majors(s["associate_cips"]),
+                "associate_majors": _build_associate_majors(s["associate_cips"], cip_names),
                 "transfer_track": bool(s["has_transfer_track"]),
                 "entrepreneurship": bool(s["offers_entrepreneurship"]),
                 "programs_known": bool(s["programs_known"]),
