@@ -120,6 +120,19 @@ def _build_associate_majors(val) -> list[dict]:
     return [{"cip4": c} for c in cips]
 
 
+def load_top_alumni() -> dict[int, dict]:
+    """Return {unit_id: {name, sitelinks}} for the most-famous alum per school."""
+    path = DATA / "processed" / "notable_alumni.csv"
+    if not path.exists():
+        return {}
+    df = pd.read_csv(path, dtype={"unit_id": int, "sitelinks": int})
+    result = {}
+    for uid, grp in df.groupby("unit_id"):
+        top = grp.nlargest(1, "sitelinks").iloc[0]
+        result[int(uid)] = {"name": str(top["name"]), "sitelinks": int(top["sitelinks"])}
+    return result
+
+
 def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
     schools = pd.read_csv(DATA / "processed" / "schools_with_majors.csv")
     cip_names = load_cip_names()
@@ -127,6 +140,7 @@ def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
     opportunities = load_opportunities()
     contacts = load_contacts().set_index("unit_id")
     program_earnings = load_program_earnings()
+    top_alumni = load_top_alumni()
 
     # index program_earnings by unit_id for fast lookup
     pe_by_school: dict[int, list[dict]] = {}
@@ -244,6 +258,7 @@ def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
                 "online_only": bool(s["online_only"]),
             },
             "contacts": contacts_block,
+            "top_alum": top_alumni.get(uid),
         }
 
         result.append(_clean(record))
