@@ -191,11 +191,13 @@ def run_profile(profile: dict) -> dict:
     all_sample_ids = top15_ids | excluded_sample_ids
 
     # Run explain_exclusion for all samples
+    # Use boolean mask (not set_index) so row.name stays the integer index position,
+    # which is required for ps_series.get(row.name, 0.5) inside explain_exclusion.
     explain_out: dict[str, list[str]] = {}
-    df_indexed = df.set_index("unit_id")
     for uid in all_sample_ids:
-        if uid in df_indexed.index:
-            row = df_indexed.loc[uid]
+        mask = df["unit_id"] == uid
+        if mask.any():
+            row = df[mask].iloc[0]
             reasons = explain_exclusion(row, client, pe, full_df=df, alumni_df=alumni_df)
             explain_out[str(uid)] = reasons
 
