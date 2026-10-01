@@ -67,6 +67,13 @@ def selectivity_tier(admit_rate) -> str:
     return "Likely"
 
 
+def load_cip_names() -> dict[int, str]:
+    """Load cip_names.csv as {int_cip4: name_string}."""
+    path = DATA / "processed" / "cip_names.csv"
+    df = pd.read_csv(path, dtype={"cip4": int})
+    return dict(zip(df["cip4"], df["name"]))
+
+
 def load_intl_aid() -> pd.DataFrame:
     path = DATA / "manual" / "intl_aid.csv"
     df = pd.read_csv(path)
@@ -93,8 +100,29 @@ def load_program_earnings() -> pd.DataFrame:
     return df.dropna(subset=["unit_id", "earn_mdn_4yr"])
 
 
+def _build_bachelor_majors(val, cip_names: dict[int, str]) -> list[dict]:
+    """Convert semicolon-separated CIP codes to [{cip4, name}] list."""
+    cips = _split_cips(val)
+    result = []
+    for c in cips:
+        try:
+            key = int(c)
+            name = cip_names.get(key, None)
+        except (ValueError, TypeError):
+            name = None
+        result.append({"cip4": c, "name": name})
+    return result
+
+
+def _build_associate_majors(val) -> list[dict]:
+    """Convert semicolon-separated CIP codes to [{cip4}] list."""
+    cips = _split_cips(val)
+    return [{"cip4": c} for c in cips]
+
+
 def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
     schools = pd.read_csv(DATA / "processed" / "schools_with_majors.csv")
+    cip_names = load_cip_names()
     intl_aid = load_intl_aid().set_index("unitid")
     opportunities = load_opportunities()
     contacts = load_contacts().set_index("unit_id")
@@ -173,6 +201,8 @@ def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
                 "control": _nan_to_none(s["control"]),
                 "religious_affiliation": _nan_to_none(s["religious_affil"]),
                 "city_size": _nan_to_none(s["city_size"]),
+                "undergrad_count": _nan_to_none(s["undergrads"]),
+                "pct_international": _nan_to_none(s["pct_international"]),
             },
             "athletics": {
                 "division": _nan_to_none(s["division"]),
@@ -193,15 +223,18 @@ def build_schools_json(out_path: Optional[Path] = None) -> list[dict]:
             "other_scholarships": opp_by_school.get(uid, []),
             "academics": {
                 "grad_rate": _nan_to_none(s["grad_rate"]),
-                "majors": _split_cips(s["bachelor_cips"]) + _split_cips(s["associate_cips"]),
+                "bachelor_majors": _build_bachelor_majors(s["bachelor_cips"], cip_names),
+                "associate_majors": _build_associate_majors(s["associate_cips"]),
                 "transfer_track": bool(s["has_transfer_track"]),
                 "entrepreneurship": bool(s["offers_entrepreneurship"]),
                 "programs_known": bool(s["programs_known"]),
                 "program_earnings": pe_by_school.get(uid, []),
+                "median_earnings_10yr": _nan_to_none(s["median_earnings_10yr"]),
             },
             "admissions": {
                 "admit_rate": _nan_to_none(s["admit_rate"]),
                 "selectivity_tier": selectivity_tier(s["admit_rate"]),
+                "open_admission": bool(s["open_admission"]),
                 "test_policy": _nan_to_none(s["test_policy"]),
                 "sat_read_25": _nan_to_none(s["sat_read_25"]),
                 "sat_read_75": _nan_to_none(s["sat_read_75"]),

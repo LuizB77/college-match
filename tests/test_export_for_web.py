@@ -76,7 +76,20 @@ def test_sports_are_lists(schools_json):
 
 def test_majors_are_lists(schools_json):
     for school in schools_json:
-        assert isinstance(school["academics"]["majors"], list)
+        assert isinstance(school["academics"]["bachelor_majors"], list), (
+            f"School {school['unit_id']}: bachelor_majors is not a list"
+        )
+        assert isinstance(school["academics"]["associate_majors"], list), (
+            f"School {school['unit_id']}: associate_majors is not a list"
+        )
+        for entry in school["academics"]["bachelor_majors"]:
+            assert "cip4" in entry, (
+                f"School {school['unit_id']}: bachelor_majors entry missing cip4 key"
+            )
+        for entry in school["academics"]["associate_majors"]:
+            assert "cip4" in entry, (
+                f"School {school['unit_id']}: associate_majors entry missing cip4 key"
+            )
 
 
 def test_json_serializable(schools_json):
